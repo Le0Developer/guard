@@ -7,15 +7,23 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
-COPY Cargo.toml Cargo.lock Toasty.toml ./
+COPY Cargo.toml Cargo.lock ./
+
+# Keep dependencies in an ordinary image layer so the GHA exporter retains
+# both Cargo's registry and compiled artifacts between fresh runners.
+RUN mkdir -p src/bin \
+    && touch src/lib.rs \
+    && printf 'fn main() {}\n' > src/bin/run.rs \
+    && printf 'fn main() {}\n' > src/bin/cli.rs \
+    && cargo build --locked --release --bin run \
+    && cargo clean --release --package guard
+
+COPY Toasty.toml ./
 COPY src ./src
 COPY views ./views
 COPY toasty ./toasty
 
-ARG TARGETARCH
-RUN --mount=type=cache,target=/usr/local/cargo/registry \
-    --mount=type=cache,id=guard-target-${TARGETARCH},target=/app/target,sharing=locked \
-    cargo build --locked --release --bin run \
+RUN cargo build --locked --release --bin run \
     && install -D target/release/run /out/guard \
     && install -d -m 0750 /out/data
 
