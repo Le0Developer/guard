@@ -1,0 +1,11 @@
+# Only send files required to compile Guard to the builder.
+**
+!Cargo.toml
+!Cargo.lock
+!Toasty.toml
+!src/
+!src/**
+!views/
+!views/**
+!toasty/
+!toasty/**

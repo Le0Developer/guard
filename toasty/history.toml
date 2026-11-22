@@ -1,0 +1,66 @@
+version = 1
+
+[[migrations]]
+id = 1405329054624454106
+name = "0000_migration.sql"
+snapshot_name = "0000_snapshot.toml"
+
+[[migrations]]
+id = 8347524784386066128
+name = "0001_migration.sql"
+snapshot_name = "0001_snapshot.toml"
+
+[[migrations]]
+id = 6127582765716707360
+name = "0002_migration.sql"
+snapshot_name = "0002_snapshot.toml"
+
+[[migrations]]
+id = 6363442709870343571
+name = "0003_migration.sql"
+snapshot_name = "0003_snapshot.toml"
+
+[[migrations]]
+id = 4668487788884169306
+name = "0004_migration.sql"
+snapshot_name = "0004_snapshot.toml"
+
+[[migrations]]
+id = 2727209474235812538
+name = "0005_client_names.sql"
+snapshot_name = "0005_snapshot.toml"
+
+[[migrations]]
+id = 6749952425092547073
+name = "0006_client_redirects.sql"
+snapshot_name = "0006_snapshot.toml"
+
+[[migrations]]
+id = 1047746266206223146
+name = "0007_oauth2_provider.sql"
+snapshot_name = "0007_snapshot.toml"
+
+[[migrations]]
+id = 8173658422286580537
+name = "0008_mfa.sql"
+snapshot_name = "0008_snapshot.toml"
+
+[[migrations]]
+id = 4471985602230396494
+name = "0009_forwardauth.sql"
+snapshot_name = "0009_snapshot.toml"
+
+[[migrations]]
+id = 4853793592646487076
+name = "0010_access_journal.sql"
+snapshot_name = "0010_snapshot.toml"
+
+[[migrations]]
+id = 3031661185617680059
+name = "0011_forwardauth_expiry_index.sql"
+snapshot_name = "0011_snapshot.toml"
+
+[[migrations]]
+id = 1193767240152745622
+name = "0012_authentication_cleanup_indexes.sql"
+snapshot_name = "0012_snapshot.toml"

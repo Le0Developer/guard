@@ -1,0 +1,20 @@
+name: guard
+
+services:
+  guard:
+    image: ${GUARD_IMAGE:?Set GUARD_IMAGE to your Guard image}
+    restart: unless-stopped
+    env_file:
+      - guard.env
+    ports:
+      - "127.0.0.1:4444:4444"
+      - "127.0.0.1:4445:4445"
+    volumes:
+      - guard-data:/data
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+
+volumes:
+  guard-data:

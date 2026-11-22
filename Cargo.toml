@@ -1,0 +1,47 @@
+[package]
+name = "guard"
+version = "0.1.0"
+edition = "2024"
+
+[[bin]]
+name = "cli"
+path = "src/bin/cli.rs"
+
+[[bin]]
+name = "run"
+path = "src/bin/run.rs"
+
+[dependencies]
+anyhow = "1.0.104"
+async-trait = "0.1.92"
+axum = "0.8.9"
+axum-extra = { version = "0.12.6", features = ["cookie"] }
+base64 = "0.23.1"
+bcrypt = "0.19.3"
+hmac = "0.13.0"
+jiff = { version = "0.2.46", features = ["serde"] }
+make_public = "0.1.0"
+rand = "0.10.4"
+rsa = { version = "0.10.0", features = ["pkcs1v15"] }
+reqwest = { version = "0.13.5", features = ["form", "json"] }
+rshtml = { version = "0.8.0", features = ["axum"] }
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = "1.0.154"
+serde_urlencoded = "0.7.1"
+sha2 = "0.11.1"
+toasty = { version = "0.11.0", features = ["jiff", "migration", "serde", "sqlite"] }
+toasty-cli = "0.11.0"
+toasty-core = "0.11.0"
+tokio = { version = "1.54.1", features = ["full"] }
+
+aes-gcm = "0.10.3"
+totp-rs = { version = "6.0.0", features = ["qr", "gen_secret"] }
+webauthn-rs = { version = "0.5.5", features = ["danger-allow-state-serialisation"] }
+uuid = { version = "1", features = ["v4", "serde"] }
+# WebAuthn's cryptographic backend; bundle OpenSSL for reproducible builds.
+openssl = { version = "0.10", features = ["vendored"] }
+ipnet = "2"
+
+[profile.release]
+strip = "symbols"
+lto = true

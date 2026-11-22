@@ -1,0 +1,22 @@
+@(user: &User, csrf: &str, section: &str, name: &str, action: &str, cancel: &str, consequence: &str)
+
+@use "../../layout/main" as Layout
+@use "../../components/header" as Header
+@use "../../components/admin_nav" as AdminNav
+
+<Layout title="Confirm deletion">
+  <Header user=@user csrf=@csrf />
+  <main class="container" id="main-content">
+    <AdminNav section="@section" />
+    <h1>Confirm deletion</h1>
+    <article>
+      <header><h2>Delete @name?</h2></header>
+      <div class="alert alert-warning" role="alert">@consequence</div>
+      <form method="POST" action="@action">
+        <input type="hidden" name="csrf_token" value="@csrf">
+        <button type="submit" class="btn btn-error">Confirm deletion</button>
+        <a href="@cancel" role="button" class="btn btn-secondary btn-outline">Cancel</a>
+      </form>
+    </article>
+  </main>
+</Layout>

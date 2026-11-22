@@ -1,0 +1,94 @@
+@(user: &User, csrf: &str, target_id: &i64, target_name: &str, base: &str, methods: &Vec<MethodRow>, backup_count: &usize)
+@use "../layout/main" as Layout
+@use "../components/header" as Header
+<Layout title="Security">
+  <Header user=@user csrf=@csrf />
+  <main class="container" id="main-content">
+    @if *target_id == user.id { <p><a class="c-info" href="/">My account</a></p> } else { <p><a class="c-info" href="/admin/users/@target_id">Back to @target_name</a></p> }
+    <h1>Security · @target_name</h1>
+    <section aria-labelledby="methods-heading">
+      <h2 id="methods-heading">Authenticators</h2>
+      @if methods.is_empty() { <p>No second factor enrolled.</p> } else {
+        <div class="overflow-auto" tabindex="0" role="region" aria-label="Authentication methods">
+          <table class="table-striped">
+            <thead><tr><th scope="col">Name</th><th scope="col">Type</th><th scope="col">Added (UTC)</th><th scope="col">Last used (UTC)</th><th scope="col">Actions</th></tr></thead>
+            <tbody>
+              @for method in methods {
+                <tr>
+                  <th scope="row">@(method.name)</th>
+                  <td>@if method.kind == "totp" { Authenticator app } else { Security key }</td>
+                  <td>@(method.created_at)</td><td>@(method.last_used)</td>
+                  <td>
+                    <details>
+                      <summary>Rename</summary>
+                      <form method="POST" action="@base/methods/@(method.kind)/@(method.id)/rename">
+                        <input type="hidden" name="csrf_token" value="@csrf">
+                        <label for="name-@(method.kind)-@(method.id)">Name</label>
+                        <input id="name-@(method.kind)-@(method.id)" name="name" value="@(method.name)" maxlength="100" required>
+                        <button class="btn btn-info" type="submit">Save name</button>
+                      </form>
+                    </details>
+                    <details>
+                      <summary>Remove</summary>
+                      <form method="POST" action="@base/methods/@(method.kind)/@(method.id)/remove">
+                        <input type="hidden" name="csrf_token" value="@csrf">
+                        <p>Remove @(method.name) from this account?</p>
+                        <button class="btn btn-error btn-outline" type="submit">Remove method</button>
+                      </form>
+                    </details>
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      }
+      <details>
+        <summary>Add authenticator app</summary>
+        <form method="POST" action="@base/totp">
+          <input type="hidden" name="csrf_token" value="@csrf">
+          <label for="totp-name">Name</label><input id="totp-name" name="name" placeholder="Phone" maxlength="100" required>
+          <button class="btn btn-info" type="submit">Set up authenticator</button>
+        </form>
+      </details>
+      <details>
+        <summary>Add security key</summary>
+        <form method="POST" action="@base/keys/start" data-webauthn="register" data-finish="@base/keys/finish">
+          <input type="hidden" name="csrf_token" value="@csrf">
+          <label for="key-name">Name</label><input id="key-name" name="name" placeholder="Security key" maxlength="100" required>
+          <button class="btn btn-info" type="submit">Register security key</button>
+          <p role="status" aria-live="polite" data-status></p>
+        </form>
+      </details>
+    </section>
+    <hr>
+    <section aria-labelledby="backup-heading">
+      <h2 id="backup-heading">Backup codes</h2>
+      <p>@backup_count unused codes.</p>
+      @if !methods.is_empty() {
+        <details>
+          <summary>Generate backup codes</summary>
+          <p>This replaces all previous codes. Save the new codes before leaving the page.</p>
+          <form method="POST" action="@base/backup-codes">
+            <input type="hidden" name="csrf_token" value="@csrf">
+            <label><input type="checkbox" name="confirm" value="generate" required> Replace existing backup codes</label>
+            <button class="btn btn-info" type="submit">Generate codes</button>
+          </form>
+        </details>
+      }
+    </section>
+    @if !methods.is_empty() {
+      <hr>
+      <details>
+        <summary>Disable MFA</summary>
+        <p>This removes all authenticators and backup codes and signs this user out of every session.</p>
+        <form method="POST" action="@base/reset">
+          <input type="hidden" name="csrf_token" value="@csrf">
+          <label><input type="checkbox" name="confirm" value="reset" required> Disable MFA for @target_name</label>
+          <button class="btn btn-error" type="submit">Disable MFA</button>
+        </form>
+      </details>
+    }
+  </main>
+  <script src="/static/security.js" defer></script>
+</Layout>

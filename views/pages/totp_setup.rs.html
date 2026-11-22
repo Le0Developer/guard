@@ -1,0 +1,19 @@
+@(user: &User, csrf: &str, base: &str, target_id: &i64, secret: &str, qr: &str, ticket: &str)
+@use "../layout/main" as Layout
+@use "../components/header" as Header
+<Layout title="Set up authenticator">
+  <Header user=@user csrf=@csrf />
+  <main class="container" id="main-content">
+    <h1>Set up authenticator</h1>
+    <p>Scan this code with the authenticator app for user #@target_id.</p>
+    <img src="data:image/png;base64,@qr" width="256" height="256" alt="Authenticator setup QR code">
+    <details><summary>Enter the setup key manually</summary><label for="setup-key">Setup key</label><input id="setup-key" value="@secret" readonly spellcheck="false" autocomplete="off"></details>
+    <form method="POST" action="@base/totp/confirm">
+      <input type="hidden" name="csrf_token" value="@csrf"><input type="hidden" name="ceremony" value="@ticket">
+      <label for="totp-code">Code from the app</label>
+      <input id="totp-code" name="code" inputmode="numeric" pattern="[0-9][0-9][0-9][0-9][0-9][0-9]" maxlength="6" autocomplete="one-time-code" required autofocus>
+      <button class="btn btn-info" type="submit">Enable authenticator</button>
+      <a class="btn btn-secondary btn-outline" role="button" href="@base">Cancel</a>
+    </form>
+  </main>
+</Layout>

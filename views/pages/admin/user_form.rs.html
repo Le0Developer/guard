@@ -1,0 +1,100 @@
+@(user: &User, csrf: &str, id: &Option<i64>, fields: &UserFields, sessions: &Vec<SessionRow>, error: &Option<String>)
+
+@use "../../layout/main" as Layout
+@use "../../components/header" as Header
+@use "../../components/admin_nav" as AdminNav
+
+<Layout title="User details">
+  <Header user=@user csrf=@csrf />
+  <main class="container" id="main-content">
+    <AdminNav section="users" />
+    <p><a class="c-info" href="/admin/users">Back to users</a></p>
+    <h1>@if id.is_some() { Edit user } else { Create user }</h1>
+    @if let Some(message) = error { <div class="alert alert-error" role="alert">@message</div> }
+    <div class="row">
+      <section class="col-12">
+        <form method="POST" action="@(id.map(|id| format!("/admin/users/{id}")).unwrap_or_else(|| "/admin/users".into()))">
+          <input type="hidden" name="csrf_token" value="@csrf">
+          <label for="username">Username</label>
+          <input id="username" name="username" value="@(fields.username)" maxlength="128" autocomplete="off" required>
+          <label for="email">Email</label>
+          <input id="email" type="email" name="email" value="@(fields.email)" maxlength="254" autocomplete="off">
+          <div class="grid">
+            <div>
+              <label for="role">Role</label>
+              <select id="role" name="role" required>
+                @if fields.role == "Admin" {
+                  <option value="User">User</option><option value="Admin" selected>Admin</option>
+                } else {
+                  <option value="User" selected>User</option><option value="Admin">Admin</option>
+                }
+              </select>
+            </div>
+          </div>
+          <details>
+            <summary>@if id.is_some() { Change password } else { Set password }</summary>
+            <label for="password">@if id.is_some() { New password } else { Password }</label>
+            <input id="password" type="password" name="password" minlength="8" maxlength="72" autocomplete="new-password" aria-describedby="password-help">
+            <small id="password-help">8–72 bytes. Leave blank to keep the current password, or to create an account without password login.</small>
+          </details>
+          <fieldset>
+            <legend>Sign-in access</legend>
+            <label for="disabled">
+              @if fields.disabled { <input id="disabled" type="checkbox" name="disabled" checked> } else { <input id="disabled" type="checkbox" name="disabled"> }
+              Disable this account
+            </label>
+            <small>Disabling an account signs it out of Guard. Existing group memberships are kept.</small>
+          </fieldset>
+          <button type="submit" class="btn btn-info">Save user</button>
+          <a href="/admin/users" role="button" class="btn btn-secondary btn-outline">Cancel</a>
+        </form>
+      </section>
+      @if let Some(id) = id {
+        <section class="col-12" aria-labelledby="security-heading">
+          <hr><h2 id="security-heading">Security</h2>
+          <a class="btn btn-info" role="button" href="/admin/users/@id/security">Manage authenticators and backup codes</a>
+        </section>
+        <section class="col-12" aria-labelledby="sessions-heading">
+          <hr>
+          <h2 id="sessions-heading">Sessions</h2>
+          @if sessions.is_empty() {
+            <p>No active sessions.</p>
+          } else {
+            <div class="overflow-auto">
+              <table class="table-striped">
+                <thead><tr><th scope="col">Session</th><th scope="col">Created</th><th scope="col">Action</th></tr></thead>
+                <tbody>
+                  @for session in sessions {
+                    <tr>
+                      <th scope="row">@(session.id)</th>
+                      <td>@(session.created_at)</td>
+                      <td><form method="POST" action="/admin/users/@id/sessions/@(session.id)/delete">
+                        <input type="hidden" name="csrf_token" value="@csrf">
+                        <button type="submit" class="btn btn-error btn-outline">Revoke session</button>
+                      </form></td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+            <form method="POST" action="/admin/users/@id/sessions/delete">
+              <input type="hidden" name="csrf_token" value="@csrf">
+              <button type="submit" class="btn btn-error">Revoke all sessions</button>
+            </form>
+          }
+        </section>
+      }
+      <aside class="col-12">
+        @if let Some(id) = id {
+          @if *id != user.id {
+            <details>
+              <summary>Delete account</summary>
+              <p>Remove this user’s access and group memberships.</p>
+              <a href="/admin/users/@id/delete" class="btn btn-error btn-outline">Delete user</a>
+            </details>
+          }
+        }
+      </aside>
+    </div>
+  </main>
+</Layout>

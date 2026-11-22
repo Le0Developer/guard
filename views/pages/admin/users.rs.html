@@ -1,0 +1,43 @@
+@(user: &User, csrf: &str, users: &Vec<UserRow>, query: &str)
+
+@use "../../layout/main" as Layout
+@use "../../components/header" as Header
+@use "../../components/admin_nav" as AdminNav
+
+<Layout title="Users">
+  <Header user=@user csrf=@csrf />
+  <main class="container" id="main-content">
+    <AdminNav section="users" />
+    <h1>Users</h1>
+    <p><a href="/admin/users/new" role="button" class="btn btn-info">Create user</a></p>
+    <form method="GET" action="/admin/users" role="search">
+      <fieldset role="group">
+        <input aria-label="Find users" id="directory-search" type="search" name="q" value="@query" placeholder="Find users">
+        <button type="submit" class="btn btn-secondary">Search</button>
+      </fieldset>
+    </form>
+    @if users.is_empty() {
+      <article>
+        <h2>No users found</h2>
+        <p>Try another search or create a user to get started.</p>
+        <a class="c-info" href="/admin/users">Clear search</a>
+      </article>
+    } else {
+      <div class="overflow-auto" tabindex="0" role="region" aria-label="Users directory">
+        <table class="table-striped table-hover">
+          <caption>@(users.len()) users</caption>
+          <thead><tr><th scope="col">Username</th><th scope="col">Role</th><th scope="col">Status</th><th scope="col">Password login</th><th scope="col">Actions</th></tr></thead>
+          <tbody>
+            @for entry in users {
+              <tr><th scope="row"><a class="c-info" href="/admin/users/@(entry.id)">@(entry.username)</a></th>
+              <td>@(entry.role)</td>
+              <td>@if entry.disabled { <span class="badge badge-warning">Disabled</span> } else { <span class="badge badge-success">Active</span> }</td>
+              <td>@if entry.local_password { Enabled } else { Not set }</td>
+              <td><a class="c-info" href="/admin/users/@(entry.id)">Edit user</a></td></tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    }
+  </main>
+</Layout>

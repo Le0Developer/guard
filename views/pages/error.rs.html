@@ -1,0 +1,17 @@
+@(error: &str)
+
+@use "../layout/main" as Layout
+
+<Layout title="Unable to continue">
+  <main class="container" id="main-content">
+    <div class="row">
+      <section class="col-12 col-lg-8 offset-lg-2">
+        <article>
+          <header><h1>Unable to continue</h1></header>
+          <div class="alert alert-error" role="alert">@error</div>
+          <footer><a href="/" role="button" class="btn btn-info">Go to my account</a> <a href="/admin" role="button" class="btn btn-secondary btn-outline">Administration</a></footer>
+        </article>
+      </section>
+    </div>
+  </main>
+</Layout>

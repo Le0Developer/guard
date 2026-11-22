@@ -1,0 +1,39 @@
+@(user: &User, csrf: &str, groups: &Vec<GroupRow>, query: &str)
+
+@use "../../layout/main" as Layout
+@use "../../components/header" as Header
+@use "../../components/admin_nav" as AdminNav
+
+<Layout title="Groups">
+  <Header user=@user csrf=@csrf />
+  <main class="container" id="main-content">
+    <AdminNav section="groups" />
+    <h1>Groups</h1>
+    <p><a href="/admin/groups/new" role="button" class="btn btn-info">Create group</a></p>
+    <form method="GET" action="/admin/groups" role="search">
+      <fieldset role="group">
+        <input aria-label="Find groups" id="directory-search" type="search" name="q" value="@query" placeholder="Find groups">
+        <button type="submit" class="btn btn-secondary">Search</button>
+      </fieldset>
+    </form>
+    @if groups.is_empty() {
+      <article>
+        <h2>No groups found</h2>
+        <p>Try another search or create a group to get started.</p>
+        <a class="c-info" href="/admin/groups">Clear search</a>
+      </article>
+    } else {
+      <div class="overflow-auto" tabindex="0" role="region" aria-label="Groups directory">
+        <table class="table-striped table-hover">
+          <caption>@(groups.len()) groups</caption>
+          <thead><tr><th scope="col">Group</th><th scope="col">Members</th><th scope="col">Actions</th></tr></thead>
+          <tbody>
+            @for entry in groups {
+              <tr><th scope="row"><a class="c-info" href="/admin/groups/@(entry.id)">@(entry.name)</a></th><td>@(entry.members)</td><td><a class="c-info" href="/admin/groups/@(entry.id)">Edit group</a></td></tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    }
+  </main>
+</Layout>

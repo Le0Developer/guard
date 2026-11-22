@@ -1,0 +1,7 @@
+/target
+/.env
+/.env.*
+/guard.env
+/guard-backup/
+*.sqlite3
+*.sqlite3-*
