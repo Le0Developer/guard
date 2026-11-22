@@ -9,6 +9,9 @@ security keys, backup codes, and an administrator dashboard.
 Run Guard behind an HTTPS reverse proxy. Use one Guard instance with a
 persistent data volume.
 
+The runtime image has no shell or package manager. Use `docker compose logs
+guard` to read its output.
+
 Images publish to `ghcr.io/le0developer/guard`.
 
 ```sh

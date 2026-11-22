@@ -16,18 +16,13 @@ ARG TARGETARCH
 RUN --mount=type=cache,target=/usr/local/cargo/registry \
     --mount=type=cache,id=guard-target-${TARGETARCH},target=/app/target,sharing=locked \
     cargo build --locked --release --bin run \
-    && install -D target/release/run /out/guard
+    && install -D target/release/run /out/guard \
+    && install -d -m 0750 /out/data
 
-FROM debian:bookworm-slim AS runtime
-
-RUN apt-get update \
-    && apt-get install -y --no-install-recommends ca-certificates libssl3 \
-    && rm -rf /var/lib/apt/lists/* \
-    && groupadd --gid 10001 guard \
-    && useradd --uid 10001 --gid guard --no-create-home --home-dir /nonexistent --shell /usr/sbin/nologin guard \
-    && install -d -o guard -g guard /data
+FROM gcr.io/distroless/cc-debian13:nonroot AS runtime
 
 COPY --from=build /out/guard /usr/local/bin/guard
+COPY --from=build --chown=10001:10001 /out/data /data
 
 ENV DATABASE_URL=sqlite:///data/guard.sqlite3 \
     LISTEN_ADDR=0.0.0.0:4444 \
