@@ -222,3 +222,25 @@ pub struct AccessLogPage<'a> {
     pub failed: u64,
     pub export_enabled: bool,
 }
+
+#[derive(View)]
+#[view(path = "views/pages/admin/user_password.rs.html", extract = false)]
+pub struct UserPasswordPage<'a> {
+    pub user: &'a User,
+    pub csrf: &'a str,
+    pub target_id: i64,
+    pub target_name: &'a str,
+    pub error: Option<String>,
+}
+
+#[derive(View)]
+#[view(path = "views/pages/admin/user_role.rs.html", extract = false)]
+pub struct UserRolePage<'a> {
+    pub user: &'a User,
+    pub csrf: &'a str,
+    pub target_id: i64,
+    pub target_name: &'a str,
+    pub current_role: &'a str,
+    pub grant_admin: bool,
+    pub error: Option<String>,
+}

@@ -232,10 +232,16 @@ impl Oidc {
             params.push(("code_verifier", &ctx.login_session.internal_token));
         }
 
-        let res = client.post(&self.token_url).form(&params).send().await;
+        let res = client.post(&self.token_url).form(&params).send().await?;
+        if !res.status().is_success() {
+            return Err(token_error(
+                res,
+                &[&self.client_secret, code, &ctx.login_session.internal_token],
+            )
+            .await);
+        }
 
-        let access_token = res?
-            .error_for_status()?
+        let access_token = res
             .json::<OidcTokenResponse>()
             .await?
             .access_token
@@ -343,6 +349,69 @@ impl UpstreamAuthenticator for Oidc {
     }
 }
 
+// OAuth servers put the actionable reason in the response body. Keep the
+// selected error fields, never the token response or submitted credentials.
+async fn token_error(mut response: reqwest::Response, sensitive: &[&str]) -> anyhow::Error {
+    let status = response.status().as_u16();
+    let mut body = Vec::new();
+    let mut complete = true;
+    loop {
+        match response.chunk().await {
+            Ok(Some(chunk)) if body.len() + chunk.len() <= 8192 => body.extend_from_slice(&chunk),
+            Ok(None) => break,
+            _ => {
+                complete = false;
+                break;
+            }
+        }
+    }
+    let error = complete
+        .then(|| serde_json::from_slice::<OidcOAuthError>(&body).ok())
+        .flatten();
+    let code = error
+        .as_ref()
+        .and_then(|error| error.error.as_deref())
+        .filter(|code| {
+            matches!(
+                *code,
+                "invalid_request"
+                    | "invalid_client"
+                    | "invalid_grant"
+                    | "unauthorized_client"
+                    | "unsupported_grant_type"
+                    | "invalid_scope"
+                    | "access_denied"
+                    | "server_error"
+                    | "temporarily_unavailable"
+            )
+        });
+    let mut message = format!("Upstream OIDC token exchange failed (HTTP {status}");
+    if let Some(code) = code {
+        message.push_str(&format!(", {code}"));
+    }
+    message.push(')');
+    if let Some(mut description) = error.and_then(|error| error.error_description) {
+        for value in sensitive.iter().filter(|value| !value.is_empty()) {
+            description = description.replace(*value, "[redacted]");
+            if let Ok(encoded) = serde_urlencoded::to_string([("v", *value)]) {
+                if let Some(encoded) = encoded.strip_prefix("v=") {
+                    description = description.replace(encoded, "[redacted]");
+                }
+            }
+        }
+        let description: String = description
+            .chars()
+            .filter(|c| !c.is_control())
+            .take(512)
+            .collect();
+        if !description.is_empty() {
+            message.push_str(": ");
+            message.push_str(&description);
+        }
+    }
+    anyhow::anyhow!(message)
+}
+
 fn derive_pkce_state(code_verifier: &str) -> String {
     let hash = Sha256::digest(code_verifier.as_bytes());
     URL_SAFE_NO_PAD.encode(hash)
@@ -351,6 +420,12 @@ fn derive_pkce_state(code_verifier: &str) -> String {
 #[derive(Deserialize)]
 struct OidcTokenResponse {
     access_token: Option<String>,
+}
+
+#[derive(Deserialize)]
+struct OidcOAuthError {
+    error: Option<String>,
+    error_description: Option<String>,
 }
 
 #[derive(Deserialize)]

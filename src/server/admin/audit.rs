@@ -48,6 +48,8 @@ fn description(entry: &AuditLogEntry) -> (String, String, String) {
                 None => "Save",
                 Some("delete") => "Delete",
                 Some("rotate-secret") => "Rotate secret",
+                Some("password") => "Reset password",
+                Some("role") => "Change role",
                 Some("sessions") => "Revoke sessions",
                 Some("members") if action.ends_with("remove") => "Remove member",
                 Some("members") => "Add member",

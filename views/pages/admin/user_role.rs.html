@@ -1,0 +1,28 @@
+@(user: &User, csrf: &str, target_id: &i64, target_name: &str, current_role: &str, grant_admin: &bool, error: &Option<String>)
+
+@use "../../layout/main" as Layout
+@use "../../components/header" as Header
+@use "../../components/admin_nav" as AdminNav
+
+<Layout title="Change user role">
+  <Header user=@user csrf=@csrf />
+  <main class="container" id="main-content">
+    <AdminNav section="users" />
+    <p><a class="c-info" href="/admin/users/@target_id">Back to @target_name</a></p>
+    <h1>@if *grant_admin { Grant administrator access } else { Remove administrator access }</h1>
+    @if *grant_admin {
+      <p><strong>@target_name</strong> will be able to manage all users, applications and security settings in Guard.</p>
+    } else {
+      <p><strong>@target_name</strong> will lose access to Guard administration.</p>
+    }
+    <p>This signs the user out on every device. They must sign in again with their new role.</p>
+    @if let Some(message) = error { <div class="alert alert-error" role="alert">@message</div> }
+    <form method="POST" action="/admin/users/@target_id/role">
+      <input type="hidden" name="csrf_token" value="@csrf">
+      <input type="hidden" name="current_role" value="@current_role">
+      <input type="hidden" name="role" value="@(if *grant_admin { "Admin" } else { "User" })">
+      <button type="submit" class="btn btn-warning">@if *grant_admin { Grant administrator access } else { Remove administrator access }</button>
+      <a class="btn btn-secondary btn-outline" role="button" href="/admin/users/@target_id">Cancel</a>
+    </form>
+  </main>
+</Layout>

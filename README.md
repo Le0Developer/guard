@@ -156,8 +156,9 @@ administrator account through a provider.
 ## Administration and applications
 
 Open `/admin` to manage users, sessions, groups and clients. Disabling an
-account or resetting its password revokes its sessions. Administrators can also
-manage a user's MFA methods and backup codes.
+account revokes its sessions. Password resets and administrator role changes
+have separate confirmation pages. Both sign the user out on every device.
+Administrators can also manage a user's MFA methods and backup codes.
 
 For OIDC applications, create an OpenID Connect client, register its exact
 callback URL, and copy the client ID, secret and discovery URL from its page.

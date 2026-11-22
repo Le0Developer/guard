@@ -1,6 +1,7 @@
 use super::*;
 use axum::extract::{Path, Query};
 use crate::models::{GroupMember, Role, Session};
+use toasty_core::driver::operation::TransactionMode;
 
 pub async fn load(db: &mut dyn toasty::Executor, id: i64) -> Result<User> {
     let user = User::get_by_id(db, id).await?;
@@ -47,56 +48,317 @@ pub async fn save(State(core): State<Arc<Core>>, Extension(user): Extension<Arc<
     write(&core, &user, &csrf.token, Some(id), data).await
 }
 
-async fn write(core: &Core, user: &User, csrf: &str, id: Option<i64>, data: HashMap<String, String>) -> Result {
-    let fields = UserFields { username: field(&data, "username").trim().into(), email: field(&data, "email").trim().into(), role: field(&data, "role"), disabled: data.contains_key("disabled") };
+async fn write(
+    core: &Core,
+    user: &User,
+    csrf: &str,
+    id: Option<i64>,
+    data: HashMap<String, String>,
+) -> Result {
+    let mut fields = UserFields {
+        username: field(&data, "username").trim().into(),
+        email: field(&data, "email").trim().into(),
+        role: field(&data, "role"),
+        disabled: data.contains_key("disabled"),
+    };
+    if let Some(id) = id {
+        let current = load(&mut core.db.clone(), id).await?;
+        fields.role = if matches!(current.role, Role::Admin) {
+            "Admin"
+        } else {
+            "User"
+        }
+        .into();
+        if data.contains_key("role") || data.contains_key("password") {
+            return form(
+                core,
+                user,
+                csrf,
+                Some(id),
+                fields,
+                Some("Use the separate role or password action to make that change.".into()),
+            )
+            .await;
+        }
+    }
     let role = match fields.role.parse::<Role>() {
         Ok(role) => role,
         Err(error) => return form(core, user, csrf, id, fields, Some(error.to_string())).await,
     };
     let password = field(&data, "password");
-    let invalid = required(&fields.username, "Username", 128).err()
-        .or_else(|| (!fields.email.is_empty() && (fields.email.len() > 254 || fields.email.chars().any(char::is_whitespace) || fields.email.split('@').count() != 2 || fields.email.starts_with('@') || fields.email.ends_with('@'))).then(|| "Enter a valid email address.".into()))
-        .or_else(|| (!password.is_empty() && !(8..=72).contains(&password.len())).then(|| "Passwords must be between 8 and 72 bytes.".into()))
-        .or_else(|| (id == Some(user.id) && (fields.disabled || !matches!(role, Role::Admin))).then(|| "You cannot disable your own account or remove your own admin role.".into()));
-    if let Some(error) = invalid { return form(core, user, csrf, id, fields, Some(error)).await; }
-    let mut db = core.db.clone();
-    if let Some(id) = id { load(&mut db, id).await?; }
-    if User::all().exec(&mut db).await?.iter().any(|u| u.username == fields.username && Some(u.id) != id) {
-        return form(core, user, csrf, id, fields, Some("This username is already in use, including by a deleted account.".into())).await;
+    let invalid = required(&fields.username, "Username", 128)
+        .err()
+        .or_else(|| {
+            (!fields.email.is_empty()
+                && (fields.email.len() > 254
+                    || fields.email.chars().any(char::is_whitespace)
+                    || fields.email.split('@').count() != 2
+                    || fields.email.starts_with('@')
+                    || fields.email.ends_with('@')))
+            .then(|| "Enter a valid email address.".into())
+        })
+        .or_else(|| {
+            (!password.is_empty() && !(8..=72).contains(&password.len()))
+                .then(|| "Passwords must be between 8 and 72 bytes.".into())
+        })
+        .or_else(|| {
+            (id == Some(user.id) && (fields.disabled || !matches!(role, Role::Admin))).then(|| {
+                "You cannot disable your own account or remove your own admin role.".into()
+            })
+        });
+    if let Some(error) = invalid {
+        return form(core, user, csrf, id, fields, Some(error)).await;
     }
-    let email = if fields.email.is_empty() { None } else { Some(fields.email.clone()) };
-    let hash = if password.is_empty() { None } else { Some(password_hash(password).await?) };
+    let mut db = core.db.clone();
+    if let Some(id) = id {
+        load(&mut db, id).await?;
+    }
+    if User::all()
+        .exec(&mut db)
+        .await?
+        .iter()
+        .any(|u| u.username == fields.username && Some(u.id) != id)
+    {
+        return form(
+            core,
+            user,
+            csrf,
+            id,
+            fields,
+            Some("This username is already in use, including by a deleted account.".into()),
+        )
+        .await;
+    }
+    let email = if fields.email.is_empty() {
+        None
+    } else {
+        Some(fields.email.clone())
+    };
+    let hash = if password.is_empty() {
+        None
+    } else {
+        Some(password_hash(password).await?)
+    };
     let mut tx = db.transaction().await?;
     let result: std::result::Result<i64, toasty::Error> = async {
         if let Some(id) = id {
-            User::filter_by_id(id).update().username(&fields.username).email(email.clone()).role(role).disabled(fields.disabled).updated_at(jiff::Timestamp::now()).exec(&mut tx).await?;
-            if hash.is_some() || fields.disabled {
+            User::filter_by_id(id)
+                .update()
+                .username(&fields.username)
+                .email(email.clone())
+                .disabled(fields.disabled)
+                .updated_at(jiff::Timestamp::now())
+                .exec(&mut tx)
+                .await?;
+            if fields.disabled {
                 crate::mfa::invalidate_logins(&mut tx, id).await?;
-            }
-            if let Some(hash) = hash {
-                User::filter_by_id(id).update().password(hash).exec(&mut tx).await?;
-                Session::filter(Session::fields().user_id().eq(id)).delete().exec(&mut tx).await?;
-            } else if fields.disabled {
-                Session::filter(Session::fields().user_id().eq(id)).delete().exec(&mut tx).await?;
+                Session::filter(Session::fields().user_id().eq(id))
+                    .delete()
+                    .exec(&mut tx)
+                    .await?;
             }
             Ok(id)
         } else {
-            let created = toasty::create!(User { username: &fields.username, email: email, password: hash, role: role, disabled: fields.disabled }).exec(&mut tx).await?;
+            let created = toasty::create!(User {
+                username: &fields.username,
+                email: email,
+                password: hash,
+                role: role,
+                disabled: fields.disabled
+            })
+            .exec(&mut tx)
+            .await?;
             Ok(created.id)
         }
-    }.await;
+    }
+    .await;
     let target_id = match result {
         Ok(id) => id,
         Err(error) => {
             eprintln!("Unable to save user: {error}");
             tx.rollback().await?;
-            return form(core, user, csrf, id, fields, Some("Unable to save this user. Check the username and try again.".into())).await;
+            return form(
+                core,
+                user,
+                csrf,
+                id,
+                fields,
+                Some("Unable to save this user. Check the username and try again.".into()),
+            )
+            .await;
         }
     };
     tx.commit().await?;
     let mut response = saved("/admin/users");
-    response.extensions_mut().insert(super::audit::Target(target_id));
+    response
+        .extensions_mut()
+        .insert(super::audit::Target(target_id));
     Ok(response)
+}
+
+fn role_name(role: &Role) -> &'static str {
+    if matches!(role, Role::Admin) {
+        "Admin"
+    } else {
+        "User"
+    }
+}
+
+fn password_form(user: &User, csrf: &str, target: &User, error: Option<String>) -> Response {
+    let status = if error.is_some() {
+        StatusCode::UNPROCESSABLE_ENTITY
+    } else {
+        StatusCode::OK
+    };
+    (
+        status,
+        UserPasswordPage {
+            user,
+            csrf,
+            target_id: target.id,
+            target_name: &target.username,
+            error,
+        }
+        .into_response(),
+    )
+        .into_response()
+}
+
+pub async fn edit_password(
+    State(core): State<Arc<Core>>,
+    Extension(user): Extension<Arc<User>>,
+    Extension(csrf): Extension<CsrfToken>,
+    Path(id): Path<i64>,
+) -> Result {
+    let target = load(&mut core.db.clone(), id).await?;
+    Ok(password_form(&user, &csrf.token, &target, None))
+}
+
+pub async fn reset_password(
+    State(core): State<Arc<Core>>,
+    Extension(user): Extension<Arc<User>>,
+    Extension(csrf): Extension<CsrfToken>,
+    Path(id): Path<i64>,
+    AdminForm(data): AdminForm,
+) -> Result {
+    let target = load(&mut core.db.clone(), id).await?;
+    let password = field(&data, "password");
+    let error = if !(8..=72).contains(&password.len()) {
+        Some("Passwords must be between 8 and 72 bytes.".into())
+    } else if password != field(&data, "confirm_password") {
+        Some("The passwords do not match.".into())
+    } else {
+        None
+    };
+    if error.is_some() {
+        return Ok(password_form(&user, &csrf.token, &target, error));
+    }
+    let hash = password_hash(password).await?;
+    let mut db = core.db.clone();
+    let mut tx = db
+        .transaction_builder()
+        .mode(TransactionMode::Immediate)
+        .begin()
+        .await?;
+    load(&mut tx, id).await?;
+    crate::mfa::invalidate_logins(&mut tx, id).await?;
+    User::filter_by_id(id)
+        .update()
+        .password(hash)
+        .updated_at(jiff::Timestamp::now())
+        .exec(&mut tx)
+        .await?;
+    Session::filter(Session::fields().user_id().eq(id))
+        .delete()
+        .exec(&mut tx)
+        .await?;
+    tx.commit().await?;
+    Ok(saved(&if id == user.id {
+        "/login".into()
+    } else {
+        format!("/admin/users/{id}")
+    }))
+}
+
+fn role_form(user: &User, csrf: &str, target: &User, error: Option<String>) -> Response {
+    let status = if error.is_some() {
+        StatusCode::UNPROCESSABLE_ENTITY
+    } else {
+        StatusCode::OK
+    };
+    (
+        status,
+        UserRolePage {
+            user,
+            csrf,
+            target_id: target.id,
+            target_name: &target.username,
+            current_role: role_name(&target.role),
+            grant_admin: !matches!(target.role, Role::Admin),
+            error,
+        }
+        .into_response(),
+    )
+        .into_response()
+}
+
+pub async fn edit_role(
+    State(core): State<Arc<Core>>,
+    Extension(user): Extension<Arc<User>>,
+    Extension(csrf): Extension<CsrfToken>,
+    Path(id): Path<i64>,
+) -> Result {
+    if id == user.id {
+        return Err(bad_input("You cannot change your own administrator role."));
+    }
+    let target = load(&mut core.db.clone(), id).await?;
+    Ok(role_form(&user, &csrf.token, &target, None))
+}
+
+pub async fn change_role(
+    State(core): State<Arc<Core>>,
+    Extension(user): Extension<Arc<User>>,
+    Extension(csrf): Extension<CsrfToken>,
+    Path(id): Path<i64>,
+    AdminForm(data): AdminForm,
+) -> Result {
+    if id == user.id {
+        return Err(bad_input("You cannot change your own administrator role."));
+    }
+    let role = field(&data, "role")
+        .parse::<Role>()
+        .map_err(|_| bad_input("Invalid role."))?;
+    let mut db = core.db.clone();
+    let mut tx = db
+        .transaction_builder()
+        .mode(TransactionMode::Immediate)
+        .begin()
+        .await?;
+    let target = load(&mut tx, id).await?;
+    if field(&data, "current_role") != role_name(&target.role)
+        || role_name(&role) == role_name(&target.role)
+    {
+        tx.rollback().await?;
+        return Ok(role_form(
+            &user,
+            &csrf.token,
+            &target,
+            Some("The user's role has changed. Review the current role before confirming.".into()),
+        ));
+    }
+    crate::mfa::invalidate_logins(&mut tx, id).await?;
+    User::filter_by_id(id)
+        .update()
+        .role(role)
+        .updated_at(jiff::Timestamp::now())
+        .exec(&mut tx)
+        .await?;
+    Session::filter(Session::fields().user_id().eq(id))
+        .delete()
+        .exec(&mut tx)
+        .await?;
+    tx.commit().await?;
+    Ok(saved(&format!("/admin/users/{id}")))
 }
 
 pub async fn confirm_delete(State(core): State<Arc<Core>>, Extension(user): Extension<Arc<User>>, Extension(csrf): Extension<CsrfToken>, Path(id): Path<i64>) -> Result {

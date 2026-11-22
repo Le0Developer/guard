@@ -19,24 +19,22 @@
           <input id="username" name="username" value="@(fields.username)" maxlength="128" autocomplete="off" required>
           <label for="email">Email</label>
           <input id="email" type="email" name="email" value="@(fields.email)" maxlength="254" autocomplete="off">
-          <div class="grid">
-            <div>
-              <label for="role">Role</label>
-              <select id="role" name="role" required>
-                @if fields.role == "Admin" {
-                  <option value="User">User</option><option value="Admin" selected>Admin</option>
-                } else {
-                  <option value="User" selected>User</option><option value="Admin">Admin</option>
-                }
-              </select>
-            </div>
-          </div>
-          <details>
-            <summary>@if id.is_some() { Change password } else { Set password }</summary>
-            <label for="password">@if id.is_some() { New password } else { Password }</label>
-            <input id="password" type="password" name="password" minlength="8" maxlength="72" autocomplete="new-password" aria-describedby="password-help">
-            <small id="password-help">8–72 bytes. Leave blank to keep the current password, or to create an account without password login.</small>
-          </details>
+          @if id.is_none() {
+            <label for="role">Role</label>
+            <select id="role" name="role" required>
+              @if fields.role == "Admin" {
+                <option value="User">User</option><option value="Admin" selected>Admin</option>
+              } else {
+                <option value="User" selected>User</option><option value="Admin">Admin</option>
+              }
+            </select>
+            <details>
+              <summary>Set password</summary>
+              <label for="password">Password</label>
+              <input id="password" type="password" name="password" minlength="8" maxlength="72" autocomplete="new-password" aria-describedby="password-help">
+              <small id="password-help">8–72 bytes. Leave blank to create an account without password login.</small>
+            </details>
+          }
           <fieldset>
             <legend>Sign-in access</legend>
             <label for="disabled">
@@ -45,14 +43,19 @@
             </label>
             <small>Disabling an account signs it out of Guard. Existing group memberships are kept.</small>
           </fieldset>
-          <button type="submit" class="btn btn-info">Save user</button>
+          <button type="submit" class="btn btn-info">@if id.is_some() { Save details } else { Create user }</button>
           <a href="/admin/users" role="button" class="btn btn-secondary btn-outline">Cancel</a>
         </form>
       </section>
       @if let Some(id) = id {
         <section class="col-12" aria-labelledby="security-heading">
           <hr><h2 id="security-heading">Security</h2>
-          <a class="btn btn-info" role="button" href="/admin/users/@id/security">Manage authenticators and backup codes</a>
+          <p>Current role: @(fields.role)</p>
+          @if *id != user.id {
+            <p><a class="btn btn-warning btn-outline" role="button" href="/admin/users/@id/role">@if fields.role == "Admin" { Remove administrator access } else { Grant administrator access }</a></p>
+          }
+          <p><a class="btn btn-warning btn-outline" role="button" href="/admin/users/@id/password">Reset password</a></p>
+          <p><a class="btn btn-info" role="button" href="/admin/users/@id/security">Manage authenticators and backup codes</a></p>
         </section>
         <section class="col-12" aria-labelledby="sessions-heading">
           <hr>

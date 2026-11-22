@@ -17,6 +17,8 @@ pub fn routes() -> Router<Arc<Core>> {
         .route("/admin/users", get(users::list).post(users::create))
         .route("/admin/users/new", get(users::new))
         .route("/admin/users/{id}", get(users::edit).post(users::save))
+        .route("/admin/users/{id}/password", get(users::edit_password).post(users::reset_password))
+        .route("/admin/users/{id}/role", get(users::edit_role).post(users::change_role))
         .route("/admin/users/{id}/delete", get(users::confirm_delete).post(users::delete))
         .route("/admin/users/{id}/sessions/delete", post(users::delete_sessions))
         .route("/admin/users/{id}/sessions/{session_id}/delete", post(users::delete_session))
