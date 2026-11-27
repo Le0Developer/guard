@@ -69,3 +69,6 @@ var passwordTemplate string
 
 //go:embed templates/totp-setup.html
 var totpSetupTemplate string
+
+//go:embed templates/admin-scim.html
+var adminSCIMTemplate string

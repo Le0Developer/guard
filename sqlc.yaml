@@ -490,6 +490,20 @@
                 "import": "github.com/le0developer/guard/internal/ids",
                 "type": "UserID"
               }
+            },
+            {
+              "column": "scim_configs.client_id",
+              "go_type": {
+                "import": "github.com/le0developer/guard/internal/ids",
+                "type": "ClientID"
+              }
+            },
+            {
+              "column": "scim_mappings.client_id",
+              "go_type": {
+                "import": "github.com/le0developer/guard/internal/ids",
+                "type": "ClientID"
+              }
             }
           ]
         }

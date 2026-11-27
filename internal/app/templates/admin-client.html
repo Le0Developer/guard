@@ -42,6 +42,10 @@
 </form>
 {{if not .Data.New}}
   <hr>
+  {{if eq .Data.Target.ClientType "Oidc"}}
+  <h2>Directory provisioning</h2>
+  <p><a class="c-info" href="/admin/clients/{{.Data.Target.ID}}/scim">Configure SCIM provisioning</a></p>
+  {{end}}
   <h2>Credentials</h2>
   <label for="client-id">Client ID</label>
   <input id="client-id" readonly value="{{.Data.Target.ClientID}}">

@@ -108,6 +108,9 @@ func (a *App) registerAdmin(mux *http.ServeMux) {
 		})
 	}
 	bind("GET /admin", a.adminHome)
+	bind("GET /admin/clients/{id}/scim", a.adminSCIM)
+	bind("POST /admin/clients/{id}/scim", a.adminSCIMSave)
+	bind("POST /admin/clients/{id}/scim/sync", a.adminSCIMSync)
 	bind("GET /admin/audit", a.adminAudit)
 	bind("GET /admin/access-log", a.adminAccess)
 	for _, section := range []string{"users", "groups", "clients"} {

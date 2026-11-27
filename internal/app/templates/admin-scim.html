@@ -1,0 +1,31 @@
+<p><a class="c-info" href="/admin/clients/{{.Data.Client.ID}}">Back to {{.Data.Client.Name}}</a></p>
+<p>Synchronize users and groups to this application's SCIM 2.0 service. Existing client access rules determine which users are assigned. Without rules, all active users are assigned.</p>
+<form method="post" action="/admin/clients/{{.Data.Client.ID}}/scim">
+  {{template "csrf" $}}
+  <label for="scim-endpoint">SCIM base endpoint</label>
+  <input id="scim-endpoint" name="endpoint" type="url" maxlength="2048" value="{{.Data.Endpoint}}" placeholder="https://service.example/scim/v2" required>
+  <small>Enter the service's base URL, without /Users or /Groups.</small>
+  <label for="scim-secret">Bearer secret</label>
+  <input id="scim-secret" name="secret" type="password" autocomplete="new-password" maxlength="4096" {{if not .Data.Configured}}required{{end}}>
+  <small>Leave blank to keep the stored secret. Enter a secret when changing the endpoint.</small>
+  <fieldset>
+    <label><input type="checkbox" name="enabled" {{if .Data.Enabled}}checked{{end}}> Enable SCIM provisioning</label>
+  </fieldset>
+  <p>Users who lose access or are disabled in Guard are deactivated remotely. Disabling provisioning leaves remote accounts unchanged. Changing the endpoint leaves the previous service unchanged.</p>
+  <button class="btn btn-info">Save provisioning</button>
+</form>
+<hr>
+<h2>Synchronization status</h2>
+<dl>
+  <dt>Status</dt><dd>{{.Data.Status}}</dd>
+  <dt>Last successful sync</dt><dd>{{if .Data.LastSuccess}}{{.Data.LastSuccess.UTC.Format "2006-01-02 15:04:05 UTC"}}{{else}}Never{{end}}</dd>
+  {{if and .Data.Enabled (not .Data.Blocked)}}<dt>Next attempt</dt><dd>{{.Data.NextAttempt.UTC.Format "2006-01-02 15:04:05 UTC"}}</dd>{{end}}
+</dl>
+{{if .Data.LastError}}<p role="alert">{{.Data.LastError}}</p>{{end}}
+{{if .Data.Enabled}}
+<form method="post" action="/admin/clients/{{.Data.Client.ID}}/scim/sync">
+  {{template "csrf" $}}
+  <button class="btn btn-secondary">Sync now</button>
+</form>
+{{end}}
+<p>Changes synchronize in the background. Enabled clients also reconcile every 15 minutes. For Cloudflare Zero Trust, users must first sign in or register a device; Access reads group claims again when users reauthenticate.</p>

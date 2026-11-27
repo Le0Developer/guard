@@ -356,3 +356,57 @@ Existing application sessions enter this tracking when Guard issues or refreshes
 an ID token containing `sid`; sign in again after upgrading if needed. A worker
 crash releases its claim after 30 seconds. In-flight deliveries may already have
 started when endpoint settings change.
+
+## Outbound SCIM provisioning
+
+For a saved OIDC client, open **Administration > Clients > Configure SCIM
+provisioning**. Enter the target service's SCIM 2.0 base URL and bearer secret,
+then enable provisioning. For Cloudflare, copy its SCIM Endpoint and Secret from
+that identity provider's settings. Keep the Cloudflare OIDC `groups` claim and
+Guard's `groups` scope configured for group-based Access policies.
+
+Guard provisions active users permitted by that client's group access rules.
+Without rules, this includes all active users. Every assigned user needs a valid,
+unique email address, including administrators if assigned. Map `userName` and
+primary `emails` to email, `displayName` to the Guard username, and `externalId`
+to a stable per-client identity. All active Guard groups are synchronized,
+including empty groups; membership includes only assigned users. Accounts are
+never adopted solely by matching email. Existing target accounts without the
+matching Guard `externalId` can produce a conflict requiring reconciliation by
+an operator.
+
+Changes are queued transactionally and delivered in the background. Disabled,
+deleted, or newly denied users previously managed by Guard receive `active:false`
+and leave synchronized groups; restored access sends `active:true`. Deleted
+managed groups are removed. Disabling provisioning or deleting/converting its
+client stops further delivery and leaves remote accounts unchanged. Changing the
+endpoint requires entering a secret and starts a new mapping generation; Guard
+leaves the old endpoint unchanged. A request already sent cannot be recalled.
+
+The admin page shows synchronization status, sanitized failures, the last
+successful sync, and **Sync now**. Network failures, HTTP 408/429 and server errors
+retry with exponential backoff (five seconds to five minutes; `Retry-After` can
+extend this up to one hour). Authentication, identity conflicts and unsupported
+protocol operations require attention; saving configuration, changing the
+directory or choosing Sync now retries them. Enabled clients also reconcile every
+15 minutes to repair remote drift. Pending progress survives restarts.
+
+Supported SCIM subset: core Users and Groups, bearer authentication, paginated
+`externalId` equality lookup, resource GET/POST, PATCH updates, and managed group
+DELETE. If discovery explicitly reports PATCH unsupported, or PATCH returns
+405/501, Guard uses PUT while preserving unrelated returned attributes. The
+client does not provision passwords, use Bulk, synchronize inbound changes, or
+provide custom attribute mapping. Endpoints require HTTPS, except HTTP loopback
+for development; redirects are rejected. Resource request/response bodies are
+limited to 2 MiB and lookups to 100,000 results / 1,000 pages. Secrets are encrypted
+with `MFA_ENCRYPTION_KEY`, bound to their client, and never shown again. Include
+that key in secure backups. Renaming users or rotating credentials preserves
+remote mappings.
+
+Cloudflare Zero Trust requires a user's first Access login or One Client device
+registration before provisioning can begin. Its Access policies evaluate OIDC
+claims at authentication; enable Cloudflare's deprovisioning and group-change
+reauthentication options for session revocation. Gateway can apply synchronized
+User Registry identities without another login. Cloudflare dashboard SSO
+provisioning is a separate integration. Live compatibility must be verified
+against your configured service; automated tests use a local SCIM service.

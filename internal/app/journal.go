@@ -363,6 +363,9 @@ func samePtr[T comparable](a, b *T) bool {
 }
 func (a *App) Background(ctx context.Context) {
 	go a.logoutWorker(ctx)
+	for range 4 {
+		go a.scimWorker(ctx)
+	}
 	cleanup := time.NewTicker(time.Minute)
 	defer cleanup.Stop()
 	export := time.NewTicker(time.Second)

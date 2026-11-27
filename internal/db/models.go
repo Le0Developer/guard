@@ -213,6 +213,33 @@ type RecoveryCode struct {
 	CreatedAt time.Time          `json:"created_at"`
 }
 
+type ScimConfig struct {
+	ClientID      ids.ClientID `json:"client_id"`
+	Endpoint      string       `json:"endpoint"`
+	Secret        string       `json:"secret"`
+	Enabled       bool         `json:"enabled"`
+	Generation    int64        `json:"generation"`
+	Revision      int64        `json:"revision"`
+	WorkRevision  int64        `json:"work_revision"`
+	Snapshot      []byte       `json:"snapshot"`
+	Cursor        int32        `json:"cursor"`
+	Attempts      int32        `json:"attempts"`
+	Blocked       bool         `json:"blocked"`
+	LastError     string       `json:"last_error"`
+	LastSuccessAt *time.Time   `json:"last_success_at"`
+	NextAttemptAt time.Time    `json:"next_attempt_at"`
+	LeaseToken    string       `json:"lease_token"`
+	LeaseUntil    *time.Time   `json:"lease_until"`
+}
+
+type ScimMapping struct {
+	ClientID   ids.ClientID `json:"client_id"`
+	Generation int64        `json:"generation"`
+	Kind       string       `json:"kind"`
+	ExternalID string       `json:"external_id"`
+	RemoteID   string       `json:"remote_id"`
+}
+
 type Session struct {
 	ID        ids.SessionID `json:"id"`
 	UserID    ids.UserID    `json:"user_id"`
