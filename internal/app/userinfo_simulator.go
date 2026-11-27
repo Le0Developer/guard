@@ -71,3 +71,16 @@ func (a *App) userinfoSimulation(r *http.Request, user db.User) (userinfoPreview
 	preview.JSON = string(payload)
 	return preview, nil
 }
+
+func (a *App) userinfoSimulator(w http.ResponseWriter, r *http.Request) {
+	user, ok := a.requireUser(w, r)
+	if !ok {
+		return
+	}
+	preview, err := a.userinfoSimulation(r, user.User)
+	if err != nil {
+		a.serverError(w, r, err)
+		return
+	}
+	a.page(w, r, "UserInfo simulator", userinfoSimulatorTemplate, map[string]any{"Preview": preview})
+}

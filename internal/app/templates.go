@@ -72,3 +72,6 @@ var totpSetupTemplate string
 
 //go:embed templates/admin-scim.html
 var adminSCIMTemplate string
+
+//go:embed templates/userinfo-simulator.html
+var userinfoSimulatorTemplate string

@@ -159,6 +159,7 @@ func (a *App) Handler() http.Handler {
 		http.ServeFile(w, r, a.Config.BrandIconFile)
 	})
 	mux.HandleFunc("GET /{$}", a.home)
+	mux.HandleFunc("GET /userinfo-simulator", a.userinfoSimulator)
 	mux.HandleFunc("GET /login", a.login)
 	mux.HandleFunc("POST /login", a.passwordLogin)
 	mux.HandleFunc("GET /login/{method}", a.login)
@@ -190,10 +191,5 @@ func (a *App) home(w http.ResponseWriter, r *http.Request) {
 		a.serverError(w, r, err)
 		return
 	}
-	preview, err := a.userinfoSimulation(r, v.User)
-	if err != nil {
-		a.serverError(w, r, err)
-		return
-	}
-	a.page(w, r, "My account", homeTemplate, map[string]any{"Account": v.User, "Apps": apps, "Preview": preview})
+	a.page(w, r, "My account", homeTemplate, map[string]any{"Account": v.User, "Apps": apps})
 }

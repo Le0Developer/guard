@@ -14,7 +14,7 @@ import (
 	"github.com/le0developer/guard/internal/db"
 )
 
-func TestHomeUserInfoSimulatorMatchesLiveUserInfo(t *testing.T) {
+func TestUserInfoSimulatorMatchesLiveUserInfo(t *testing.T) {
 	f := newOAuthFixture(t)
 	status, tokens := f.post("/oauth2/token", oauthCodeFields(f.code(t)))
 	if status != 200 {
@@ -30,10 +30,10 @@ func TestHomeUserInfoSimulatorMatchesLiveUserInfo(t *testing.T) {
 	}
 	for _, scope := range []string{"openid profile email", "openid"} {
 		query := url.Values{"preview_client": {f.client.ClientID}, "preview_scope": {scope}}
-		request = httptest.NewRequest("GET", "/?"+query.Encode(), nil)
+		request = httptest.NewRequest("GET", "/userinfo-simulator?"+query.Encode(), nil)
 		request = request.WithContext(context.WithValue(request.Context(), identityKey{}, f.who))
 		response := httptest.NewRecorder()
-		f.a.home(response, request)
+		f.a.Handler().ServeHTTP(response, request)
 		if response.Code != 200 {
 			t.Fatalf("home: %d %s", response.Code, response.Body.String())
 		}
@@ -57,7 +57,7 @@ func TestHomeUserInfoSimulatorMatchesLiveUserInfo(t *testing.T) {
 	}
 }
 
-func TestHomeUserInfoSimulatorFiltersClientsAndScopes(t *testing.T) {
+func TestUserInfoSimulatorFiltersClientsAndScopes(t *testing.T) {
 	f := newOAuthFixture(t)
 	ctx := context.Background()
 	group, err := f.a.Q.CreateGroup(ctx, db.CreateGroupParams{Name: "Restricted"})
@@ -68,10 +68,10 @@ func TestHomeUserInfoSimulatorFiltersClientsAndScopes(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, query := range []string{"preview_client=client", "preview_client=unknown", "preview_client=client&preview_scope=openid+invalid"} {
-		r := httptest.NewRequest("GET", "/?"+query, nil)
+		r := httptest.NewRequest("GET", "/userinfo-simulator?"+query, nil)
 		r = r.WithContext(context.WithValue(r.Context(), identityKey{}, f.who))
 		w := httptest.NewRecorder()
-		f.a.home(w, r)
+		f.a.Handler().ServeHTTP(w, r)
 		if w.Code != 200 || strings.Contains(w.Body.String(), `id="userinfo-json"`) {
 			t.Fatalf("unauthorized client preview: %d %s", w.Code, w.Body.String())
 		}
@@ -80,12 +80,21 @@ func TestHomeUserInfoSimulatorFiltersClientsAndScopes(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, scope := range []string{"openid invalid", "profile"} {
-		r := httptest.NewRequest("GET", "/?"+url.Values{"preview_client": {f.client.ClientID}, "preview_scope": {scope}}.Encode(), nil)
+		r := httptest.NewRequest("GET", "/userinfo-simulator?"+url.Values{"preview_client": {f.client.ClientID}, "preview_scope": {scope}}.Encode(), nil)
 		r = r.WithContext(context.WithValue(r.Context(), identityKey{}, f.who))
 		w := httptest.NewRecorder()
-		f.a.home(w, r)
+		f.a.Handler().ServeHTTP(w, r)
 		if w.Code != 200 || strings.Contains(w.Body.String(), `id="userinfo-json"`) {
 			t.Fatalf("invalid scope preview: %d %s", w.Code, w.Body.String())
 		}
+	}
+}
+
+func TestUserInfoSimulatorRequiresSignIn(t *testing.T) {
+	r := httptest.NewRequest("GET", "/userinfo-simulator", nil)
+	w := httptest.NewRecorder()
+	(&App{}).Handler().ServeHTTP(w, r)
+	if w.Code != 303 || !strings.HasPrefix(w.Header().Get("Location"), "/login?") {
+		t.Fatalf("simulator must require sign-in: %d %s", w.Code, w.Header().Get("Location"))
 	}
 }
