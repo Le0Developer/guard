@@ -8,6 +8,10 @@
   <label for="scim-secret">Bearer secret</label>
   <input id="scim-secret" name="secret" type="password" autocomplete="new-password" maxlength="4096" {{if not .Data.Configured}}required{{end}}>
   <small>Leave blank to keep the stored secret. Enter a secret when changing the endpoint.</small>
+  <label for="scim-group-patterns">Group whitelist</label>
+  <textarea id="scim-group-patterns" name="group_patterns" rows="5" maxlength="16384" aria-describedby="scim-group-patterns-help">{{.Data.GroupPatterns}}</textarea>
+  <small id="scim-group-patterns-help">One group name or pattern per line, for example team-* or Admins. Matching is case-sensitive; * matches any characters, including /. Blank syncs no groups; * alone syncs all groups. User assignment still follows client access rules.</small>
+  <p>Groups previously synced by Guard are deleted from the service when they no longer match this whitelist.</p>
   <fieldset>
     <label><input type="checkbox" name="enabled" {{if .Data.Enabled}}checked{{end}}> Enable SCIM provisioning</label>
   </fieldset>

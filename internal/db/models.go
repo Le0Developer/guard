@@ -300,6 +300,7 @@ type ScimConfig struct {
 	NextAttemptAt time.Time    `json:"next_attempt_at"`
 	LeaseToken    string       `json:"lease_token"`
 	LeaseUntil    *time.Time   `json:"lease_until"`
+	GroupPatterns string       `json:"group_patterns"`
 }
 
 type ScimMapping struct {

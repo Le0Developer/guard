@@ -45,7 +45,7 @@ WITH candidate AS (
  ORDER BY s.next_attempt_at,s.client_id LIMIT 1 FOR UPDATE OF s SKIP LOCKED
 )
 UPDATE scim_configs s SET lease_token=$1,lease_until=now()+interval '2 minutes'
-FROM candidate c WHERE s.client_id=c.client_id RETURNING s.client_id, s.endpoint, s.secret, s.enabled, s.generation, s.revision, s.work_revision, s.snapshot, s.cursor, s.attempts, s.blocked, s.last_error, s.last_success_at, s.next_attempt_at, s.lease_token, s.lease_until
+FROM candidate c WHERE s.client_id=c.client_id RETURNING s.client_id, s.endpoint, s.secret, s.enabled, s.generation, s.revision, s.work_revision, s.snapshot, s.cursor, s.attempts, s.blocked, s.last_error, s.last_success_at, s.next_attempt_at, s.lease_token, s.lease_until, s.group_patterns
 `
 
 func (q *Queries) ClaimSCIM(ctx context.Context, leaseToken string) (ScimConfig, error) {
@@ -68,6 +68,7 @@ func (q *Queries) ClaimSCIM(ctx context.Context, leaseToken string) (ScimConfig,
 		&i.NextAttemptAt,
 		&i.LeaseToken,
 		&i.LeaseUntil,
+		&i.GroupPatterns,
 	)
 	return i, err
 }
@@ -174,7 +175,7 @@ func (q *Queries) FenceSCIM(ctx context.Context, arg FenceSCIMParams) (int64, er
 }
 
 const getSCIMConfig = `-- name: GetSCIMConfig :one
-SELECT client_id, endpoint, secret, enabled, generation, revision, work_revision, snapshot, cursor, attempts, blocked, last_error, last_success_at, next_attempt_at, lease_token, lease_until FROM scim_configs WHERE client_id=$1
+SELECT client_id, endpoint, secret, enabled, generation, revision, work_revision, snapshot, cursor, attempts, blocked, last_error, last_success_at, next_attempt_at, lease_token, lease_until, group_patterns FROM scim_configs WHERE client_id=$1
 `
 
 func (q *Queries) GetSCIMConfig(ctx context.Context, clientID ids.ClientID) (ScimConfig, error) {
@@ -197,6 +198,7 @@ func (q *Queries) GetSCIMConfig(ctx context.Context, clientID ids.ClientID) (Sci
 		&i.NextAttemptAt,
 		&i.LeaseToken,
 		&i.LeaseUntil,
+		&i.GroupPatterns,
 	)
 	return i, err
 }
@@ -327,21 +329,22 @@ func (q *Queries) RequestSCIMSync(ctx context.Context, clientID ids.ClientID) (i
 }
 
 const saveSCIMConfig = `-- name: SaveSCIMConfig :one
-INSERT INTO scim_configs (client_id,endpoint,secret,enabled) VALUES ($1,$2,$3,$4)
+INSERT INTO scim_configs (client_id,endpoint,secret,enabled,group_patterns) VALUES ($1,$2,$3,$4,$5)
 ON CONFLICT (client_id) DO UPDATE SET
  generation=scim_configs.generation + CASE WHEN scim_configs.endpoint<>EXCLUDED.endpoint THEN 1 ELSE 0 END,
- endpoint=EXCLUDED.endpoint,secret=EXCLUDED.secret,enabled=EXCLUDED.enabled,
+ endpoint=EXCLUDED.endpoint,secret=EXCLUDED.secret,enabled=EXCLUDED.enabled,group_patterns=EXCLUDED.group_patterns,
  revision=scim_configs.revision+1,work_revision=0,snapshot='[]',cursor=0,
  attempts=0,blocked=false,last_error='',next_attempt_at=now(),lease_token='',lease_until=NULL,
  last_success_at=CASE WHEN scim_configs.endpoint<>EXCLUDED.endpoint THEN NULL ELSE scim_configs.last_success_at END
-RETURNING client_id, endpoint, secret, enabled, generation, revision, work_revision, snapshot, cursor, attempts, blocked, last_error, last_success_at, next_attempt_at, lease_token, lease_until
+RETURNING client_id, endpoint, secret, enabled, generation, revision, work_revision, snapshot, cursor, attempts, blocked, last_error, last_success_at, next_attempt_at, lease_token, lease_until, group_patterns
 `
 
 type SaveSCIMConfigParams struct {
-	ClientID ids.ClientID `json:"client_id"`
-	Endpoint string       `json:"endpoint"`
-	Secret   string       `json:"secret"`
-	Enabled  bool         `json:"enabled"`
+	ClientID      ids.ClientID `json:"client_id"`
+	Endpoint      string       `json:"endpoint"`
+	Secret        string       `json:"secret"`
+	Enabled       bool         `json:"enabled"`
+	GroupPatterns string       `json:"group_patterns"`
 }
 
 func (q *Queries) SaveSCIMConfig(ctx context.Context, arg SaveSCIMConfigParams) (ScimConfig, error) {
@@ -350,6 +353,7 @@ func (q *Queries) SaveSCIMConfig(ctx context.Context, arg SaveSCIMConfigParams) 
 		arg.Endpoint,
 		arg.Secret,
 		arg.Enabled,
+		arg.GroupPatterns,
 	)
 	var i ScimConfig
 	err := row.Scan(
@@ -369,6 +373,7 @@ func (q *Queries) SaveSCIMConfig(ctx context.Context, arg SaveSCIMConfigParams) 
 		&i.NextAttemptAt,
 		&i.LeaseToken,
 		&i.LeaseUntil,
+		&i.GroupPatterns,
 	)
 	return i, err
 }

@@ -12,6 +12,7 @@ import (
 type scimAdminView struct {
 	Client                                db.Client
 	Endpoint                              string
+	GroupPatterns                         string
 	Enabled, Configured, Blocked, Running bool
 	LastError, Status                     string
 	LastSuccess                           *time.Time
@@ -35,7 +36,7 @@ func (a *App) adminSCIM(w http.ResponseWriter, r *http.Request, _ *identity) err
 	if err != nil && !notFound(err) {
 		return err
 	}
-	view := scimAdminView{Client: c, Endpoint: cfg.Endpoint, Enabled: cfg.Enabled, Configured: err == nil, Blocked: cfg.Blocked, LastError: cfg.LastError, LastSuccess: cfg.LastSuccessAt, NextAttempt: cfg.NextAttemptAt}
+	view := scimAdminView{Client: c, Endpoint: cfg.Endpoint, GroupPatterns: cfg.GroupPatterns, Enabled: cfg.Enabled, Configured: err == nil, Blocked: cfg.Blocked, LastError: cfg.LastError, LastSuccess: cfg.LastSuccessAt, NextAttempt: cfg.NextAttemptAt}
 	view.Running = cfg.LeaseUntil != nil && cfg.LeaseUntil.After(time.Now())
 	switch {
 	case !view.Configured:
@@ -61,7 +62,12 @@ func (a *App) adminSCIMSave(w http.ResponseWriter, r *http.Request, actor *ident
 	if err != nil {
 		return err
 	}
-	if err = a.saveSCIMAs(r.Context(), id, r.Form.Get("endpoint"), r.Form.Get("secret"), r.Form.Get("enabled") == "on", actor.User.ID); err != nil {
+	var patterns *string
+	if r.Form.Has("group_patterns") {
+		value := r.Form.Get("group_patterns")
+		patterns = &value
+	}
+	if err = a.saveSCIMAs(r.Context(), id, r.Form.Get("endpoint"), r.Form.Get("secret"), r.Form.Get("enabled") == "on", actor.User.ID, patterns); err != nil {
 		return err
 	}
 	http.Redirect(w, r, scimAdminPath(id), http.StatusSeeOther)

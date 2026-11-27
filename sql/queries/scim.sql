@@ -2,10 +2,10 @@
 SELECT * FROM scim_configs WHERE client_id=$1;
 
 -- name: SaveSCIMConfig :one
-INSERT INTO scim_configs (client_id,endpoint,secret,enabled) VALUES ($1,$2,$3,$4)
+INSERT INTO scim_configs (client_id,endpoint,secret,enabled,group_patterns) VALUES ($1,$2,$3,$4,$5)
 ON CONFLICT (client_id) DO UPDATE SET
  generation=scim_configs.generation + CASE WHEN scim_configs.endpoint<>EXCLUDED.endpoint THEN 1 ELSE 0 END,
- endpoint=EXCLUDED.endpoint,secret=EXCLUDED.secret,enabled=EXCLUDED.enabled,
+ endpoint=EXCLUDED.endpoint,secret=EXCLUDED.secret,enabled=EXCLUDED.enabled,group_patterns=EXCLUDED.group_patterns,
  revision=scim_configs.revision+1,work_revision=0,snapshot='[]',cursor=0,
  attempts=0,blocked=false,last_error='',next_attempt_at=now(),lease_token='',lease_until=NULL,
  last_success_at=CASE WHEN scim_configs.endpoint<>EXCLUDED.endpoint THEN NULL ELSE scim_configs.last_success_at END

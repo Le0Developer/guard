@@ -229,3 +229,10 @@ Configure the target service to map `userName` and primary `emails` to email,
 Give assigned users valid, unique email addresses and configure the client's
 group access rules before enabling synchronization. Use **Sync now** to check
 the connection and review its status.
+
+Set **Group whitelist** to one exact group name or pattern per line, such as
+`Admins` and `team-*`. Matching is case-sensitive; `*` matches any characters,
+including `/`. Blank syncs no groups; `*` alone syncs all groups. Existing SCIM
+configurations retain `*` on upgrade. Groups previously managed by Guard are
+deleted remotely when they stop matching. User assignment still follows the
+client's access rules, independently of this group whitelist.

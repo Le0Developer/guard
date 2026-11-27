@@ -56,9 +56,9 @@ func (a *App) scimOpen(id ids.ClientID, sealed string) (string, error) {
 	return string(out), nil
 }
 func (a *App) saveSCIM(ctx context.Context, id ids.ClientID, endpoint, secret string, enabled bool) error {
-	return a.saveSCIMAs(ctx, id, endpoint, secret, enabled, 0)
+	return a.saveSCIMAs(ctx, id, endpoint, secret, enabled, 0, nil)
 }
-func (a *App) saveSCIMAs(ctx context.Context, id ids.ClientID, endpoint, secret string, enabled bool, actor ids.UserID) error {
+func (a *App) saveSCIMAs(ctx context.Context, id ids.ClientID, endpoint, secret string, enabled bool, actor ids.UserID, groupPatterns *string) error {
 	endpoint = strings.TrimRight(strings.TrimSpace(endpoint), "/")
 	if err := validateSCIMURL(endpoint); err != nil {
 		return adminInvalid(err.Error())
@@ -78,6 +78,16 @@ func (a *App) saveSCIMAs(ctx context.Context, id ids.ClientID, endpoint, secret 
 		if err != nil && !notFound(err) {
 			return err
 		}
+		patterns := old.GroupPatterns
+		if notFound(err) {
+			patterns = "*"
+		}
+		if groupPatterns != nil {
+			patterns, err = normalizeSCIMGroupPatterns(*groupPatterns)
+			if err != nil {
+				return err
+			}
+		}
 		sealed := old.Secret
 		if secret != "" {
 			sealed, err = a.scimSeal(id, secret)
@@ -92,12 +102,12 @@ func (a *App) saveSCIMAs(ctx context.Context, id ids.ClientID, endpoint, secret 
 		if old.Endpoint != "" && old.Endpoint != endpoint && secret == "" {
 			return adminInvalid("Enter a bearer secret when changing the SCIM endpoint.")
 		}
-		_, err = q.SaveSCIMConfig(ctx, db.SaveSCIMConfigParams{ClientID: id, Endpoint: endpoint, Secret: sealed, Enabled: enabled})
+		_, err = q.SaveSCIMConfig(ctx, db.SaveSCIMConfigParams{ClientID: id, Endpoint: endpoint, Secret: sealed, Enabled: enabled, GroupPatterns: patterns})
 		if err != nil {
 			return err
 		}
 		if actor != 0 {
-			return a.audit(ctx, q, actor, "SCIMConfigurationChanged", map[string]any{"client_id": id, "enabled": enabled, "endpoint_changed": old.Endpoint != endpoint})
+			return a.audit(ctx, q, actor, "SCIMConfigurationChanged", map[string]any{"client_id": id, "enabled": enabled, "endpoint_changed": old.Endpoint != endpoint, "group_scope_changed": old.GroupPatterns != patterns})
 		}
 		return nil
 	})
@@ -207,8 +217,12 @@ func (a *App) scimSnapshot(ctx context.Context, cfg *db.ScimConfig) ([]scimJob, 
 			jobs = append(jobs, scimJob{Kind: "Users", ExternalID: m.ExternalID, Desired: map[string]any{"schemas": []string{scimUserSchema}, "externalId": m.ExternalID, "active": false}})
 		}
 	}
+	matchesGroup, err := scimGroupFilter(current.GroupPatterns)
+	if err != nil {
+		return nil, err
+	}
 	for _, g := range groups {
-		if g.DeletedAt != nil {
+		if g.DeletedAt != nil || !matchesGroup(g.Name) {
 			continue
 		}
 		ext := a.scimGroupID(client, g.ID)
