@@ -4,8 +4,8 @@ import (
 	"bytes"
 	"compress/flate"
 	"context"
+	"crypto/x509"
 	"encoding/base64"
-	"encoding/json"
 	"encoding/xml"
 	"fmt"
 	"github.com/crewjam/saml"
@@ -17,6 +17,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"os"
 	"regexp"
 	"sort"
 	"strings"
@@ -31,14 +32,13 @@ func TestSAMLConfigurationAndMetadata(t *testing.T) {
 	if e != nil {
 		t.Fatal(e)
 	}
-	attrs, _ := json.Marshal(map[string]string{"username": "username"})
-	if _, e = a.Q.SaveSAMLConfig(ctx, db.SaveSAMLConfigParams{ClientID: c.ID, EntityID: "https://sp", NameIDFormat: samlidp.Persistent, Attributes: attrs}); e != nil {
+	if _, e = a.Q.SaveSAMLConfig(ctx, db.SaveSAMLConfigParams{ClientID: c.ID, EntityID: "https://sp", NameIDFormat: samlidp.Persistent}); e != nil {
 		t.Fatal(e)
 	}
 	if e = a.Q.CreateSAMLACS(ctx, db.CreateSAMLACSParams{ClientID: c.ID, Url: "https://sp/acs", IsDefault: true}); e != nil {
 		t.Fatal(e)
 	}
-	if e = a.createSAMLKey(ctx, a.Q, c.ID, "active"); e != nil {
+	if e = a.createSAMLKey(ctx, a.Q, c.ID); e != nil {
 		t.Fatal(e)
 	}
 	rr := httptest.NewRecorder()
@@ -65,7 +65,7 @@ func TestSAMLAdminRoutes(t *testing.T) {
 	mux := http.NewServeMux()
 	a.registerAdmin(mux)
 	mux.ServeHTTP(w, r)
-	if w.Code != 200 || !strings.Contains(w.Body.String(), "SP entity ID") {
+	if w.Code != 200 || !strings.Contains(w.Body.String(), "Application identifier (Entity ID)") {
 		t.Fatalf("admin %d %s", w.Code, w.Body.String())
 	}
 }
@@ -78,14 +78,14 @@ func samlFixture(t *testing.T) (*App, db.Client, *http.Cookie) {
 	if e != nil {
 		t.Fatal(e)
 	}
-	_, e = a.Q.SaveSAMLConfig(ctx, db.SaveSAMLConfigParams{ClientID: c.ID, EntityID: "https://sp", NameIDFormat: samlidp.Persistent, Attributes: []byte(`{"username":"username","groups":"groups"}`)})
+	_, e = a.Q.SaveSAMLConfig(ctx, db.SaveSAMLConfigParams{ClientID: c.ID, EntityID: "https://sp", NameIDFormat: samlidp.Persistent})
 	if e != nil {
 		t.Fatal(e)
 	}
 	if e = a.Q.CreateSAMLACS(ctx, db.CreateSAMLACSParams{ClientID: c.ID, Url: "https://sp/acs", IsDefault: true}); e != nil {
 		t.Fatal(e)
 	}
-	if e = a.createSAMLKey(ctx, a.Q, c.ID, "active"); e != nil {
+	if e = a.createSAMLKey(ctx, a.Q, c.ID); e != nil {
 		t.Fatal(e)
 	}
 	u, e := a.Q.CreateUser(ctx, db.CreateUserParams{Username: "alice", Role: "User", Email: "alice@example.com", WebauthnUserID: []byte("alice")})
@@ -135,6 +135,18 @@ func samlField(w *httptest.ResponseRecorder, name string) string {
 }
 func TestSAMLFlowAndReplay(t *testing.T) {
 	a, c, session := samlFixture(t)
+	ctx := context.Background()
+	sr, e := a.Q.SessionByTokenHash(ctx, security.Hash(session.Value))
+	if e != nil {
+		t.Fatal(e)
+	}
+	g, e := a.Q.CreateGroup(ctx, db.CreateGroupParams{Name: "staff"})
+	if e != nil {
+		t.Fatal(e)
+	}
+	if e = a.Q.AdminAddMember(ctx, db.AdminAddMemberParams{GroupID: g.ID, UserID: sr.UserID}); e != nil {
+		t.Fatal(e)
+	}
 	h := a.Handler()
 	start := samlHTTP(h, "GET", samlRequestURL(a, c, "_flow", ""), nil, session)
 	if start.Code != 303 {
@@ -167,6 +179,19 @@ func TestSAMLFlowAndReplay(t *testing.T) {
 	assertion, e := sp.ParseXMLResponse(raw, []string{"_flow"}, *acs)
 	if e != nil {
 		t.Fatal(e)
+	}
+	values := map[string][]string{}
+	for _, statement := range assertion.AttributeStatements {
+		for _, attribute := range statement.Attributes {
+			for _, v := range attribute.Values {
+				values[attribute.Name] = append(values[attribute.Name], v.Value)
+			}
+		}
+	}
+	for name, want := range map[string]string{"uid": a.oidcSubject(c, sr.UserID), "username": "alice", "email": "alice@example.com", "groups": "staff"} {
+		if len(values[name]) != 1 || values[name][0] != want {
+			t.Fatalf("fixed attribute %s: %v", name, values[name])
+		}
 	}
 	if assertion.Subject.NameID.Value == "" || samlField(out, "RelayState") != "opaque-state" {
 		t.Fatal("identity or relay lost")
@@ -328,7 +353,7 @@ func TestSAMLConfigurationChangeAndRevocation(t *testing.T) {
 		})
 	}
 }
-func TestSAMLAdminSaveAndRotation(t *testing.T) {
+func TestSAMLAdminSaveKeepsSingleCertificate(t *testing.T) {
 	a, c, session := samlFixture(t)
 	ctx := context.Background()
 	s, e := a.Q.SessionByTokenHash(ctx, security.Hash(session.Value))
@@ -351,39 +376,24 @@ func TestSAMLAdminSaveAndRotation(t *testing.T) {
 		return w
 	}
 	path := samlAdminPath(c.ID)
-	form := url.Values{"entity_id": {"https://sp"}, "name_id_format": {samlidp.Persistent}, "acs": {"0 https://sp/acs\n1 https://sp/second"}, "default_index": {"1"}, "attribute_username": {"username"}, "key_overlap_s": {"3600"}, "launch_url": {"https://sp/login"}}
+	form := url.Values{"entity_id": {"https://sp"}, "name_id_format": {samlidp.Persistent}, "acs": {"0 https://sp/acs\n1 https://sp/second"}, "default_index": {"1"}, "launch_url": {"https://sp/login"}}
 	if out := request(path, form); out.Code != 303 {
 		t.Fatalf("save %d %s", out.Code, out.Body.String())
 	}
-	cfg, e := a.Q.GetSAMLConfig(ctx, c.ID)
-	if e != nil || cfg.KeyOverlapS != 3600 {
-		t.Fatalf("config %+v %v", cfg, e)
-	}
-	if out := request(path+"/keys/prepare", nil); out.Code != 303 {
-		t.Fatalf("prepare %d %s", out.Code, out.Body.String())
-	}
 	keys, e := a.Q.SAMLKeys(ctx, c.ID)
-	if e != nil || len(keys) != 2 {
-		t.Fatalf("keys %v %v", keys, e)
+	if e != nil || len(keys) != 1 {
+		t.Fatalf("want one certificate: %d %v", len(keys), e)
 	}
-	if out := request(path+"/keys/activate", url.Values{"confirm": {"activate"}}); out.Code != 303 {
-		t.Fatalf("activate %d %s", out.Code, out.Body.String())
+	original := append([]byte(nil), keys[0].Certificate...)
+	if out := request(path, form); out.Code != 303 {
+		t.Fatalf("save again %d %s", out.Code, out.Body.String())
 	}
 	keys, e = a.Q.SAMLKeys(ctx, c.ID)
-	if e != nil {
-		t.Fatal(e)
+	if e != nil || len(keys) != 1 || !bytes.Equal(original, keys[0].Certificate) {
+		t.Fatal("saving changed the certificate")
 	}
-	retired := false
-	for _, k := range keys {
-		if k.State == "retired" {
-			retired = true
-			if k.RetireAt == nil || time.Until(*k.RetireAt) < 59*time.Minute {
-				t.Fatal("wrong overlap")
-			}
-		}
-	}
-	if !retired {
-		t.Fatal("old key not retired")
+	if out := request(path+"/keys/prepare", nil); out.Code != 404 {
+		t.Fatalf("rotation still exposed: %d", out.Code)
 	}
 	form.Set("acs", "0 https://evil/acs\n0 https://sp/acs")
 	if out := request(path, form); out.Code != 422 {
@@ -422,7 +432,7 @@ func samlChangeRequestXML(path, old, new string) string {
 func TestSAMLEmailNameIDWithoutCreatingPersistentMapping(t *testing.T) {
 	a, c, session := samlFixture(t)
 	ctx := context.Background()
-	_, e := a.Q.SaveSAMLConfig(ctx, db.SaveSAMLConfigParams{ClientID: c.ID, EntityID: "https://sp", NameIDFormat: samlidp.Email, Attributes: []byte(`{}`)})
+	_, e := a.Q.SaveSAMLConfig(ctx, db.SaveSAMLConfigParams{ClientID: c.ID, EntityID: "https://sp", NameIDFormat: samlidp.Email})
 	if e != nil {
 		t.Fatal(e)
 	}
@@ -443,6 +453,15 @@ func TestSAMLEmailNameIDWithoutCreatingPersistentMapping(t *testing.T) {
 	if _, e = a.Q.GetSAMLSubject(ctx, db.GetSAMLSubjectParams{ClientID: c.ID, UserID: sr.UserID}); !notFound(e) {
 		t.Fatalf("created persistent subject despite AllowCreate=false: %v", e)
 	}
+	firstUID := samlUIDFromResponse(t, raw)
+	start = samlHTTP(h, "GET", samlRequestURL(a, c, "_emailcreate", ""), nil, session, browser)
+	cont = samlHTTP(h, "GET", start.Header().Get("Location"), nil, session, browser)
+	out = samlHTTP(h, "POST", "/saml/flow/issue", url.Values{"t": {samlField(cont, "t")}, "csrf_token": {samlField(cont, "csrf_token")}}, session, browser)
+	raw, _ = base64.StdEncoding.DecodeString(samlField(out, "SAMLResponse"))
+	if out.Code != 200 || firstUID == "" || samlUIDFromResponse(t, raw) != firstUID {
+		t.Fatal("uid changed after creating a persistent mapping")
+	}
+
 }
 func TestSAMLFailureJournalAndCapacity(t *testing.T) {
 	a, c, session := samlFixture(t)
@@ -488,4 +507,103 @@ func TestSAMLUnsupportedContextReturnsSignedErrorWithoutForcedLogin(t *testing.T
 	if out.Code != 200 || !bytes.Contains(raw, []byte("NoAuthnContext")) {
 		t.Fatalf("context error %d %s", out.Code, out.Body.String())
 	}
+}
+
+func TestSAMLHasNoAttributeOrRotationSettings(t *testing.T) {
+	r := httptest.NewRequest("GET", "/admin/clients/1/saml", nil)
+	w := httptest.NewRecorder()
+	(&App{}).page(w, r, "SAML configuration", adminSAMLTemplate, map[string]any{"Client": db.Client{ID: 1}, "Config": db.SamlClientConfig{}, "Action": "/admin/clients/1/saml"})
+	if w.Code != 200 {
+		t.Fatal(w.Body.String())
+	}
+	for _, old := range []string{"attribute_", "Released attributes", "Prepare next", "overlap", "expires"} {
+		if strings.Contains(w.Body.String(), old) {
+			t.Fatalf("obsolete setting remains: %s", old)
+		}
+	}
+}
+func TestSAMLClientAutomaticallyGetsOneCertificate(t *testing.T) {
+	a := testApp(t)
+	ctx := context.Background()
+	u, e := a.Q.CreateUser(ctx, db.CreateUserParams{Username: "admin-auto", Role: "Admin", WebauthnUserID: []byte("auto")})
+	if e != nil {
+		t.Fatal(e)
+	}
+	r := httptest.NewRequest("POST", "/admin/clients", strings.NewReader(url.Values{"name": {"Auto SAML"}, "client_type": {"Saml"}, "session_lifetime_s": {"3600"}}.Encode()))
+	r.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	r.ParseForm()
+	w := httptest.NewRecorder()
+	if e = a.adminWriteClient(w, r, &identity{User: u}); e != nil {
+		t.Fatal(e)
+	}
+	clients, e := a.Q.ListClients(ctx)
+	if e != nil || len(clients) != 1 {
+		t.Fatalf("clients %v %v", clients, e)
+	}
+	keys, e := a.Q.SAMLKeys(ctx, clients[0].ID)
+	if e != nil || len(keys) != 1 {
+		t.Fatalf("automatic certificate: %d %v", len(keys), e)
+	}
+	cert, e := x509.ParseCertificate(keys[0].Certificate)
+	if e != nil || cert.NotAfter.Year() != 9999 {
+		t.Fatalf("unexpected expiry %v %v", cert, e)
+	}
+}
+
+func TestSAMLUpgradePreservesCurrentCertificate(t *testing.T) {
+	a, c, _ := samlFixture(t)
+	ctx := context.Background()
+	keys, e := a.Q.SAMLKeys(ctx, c.ID)
+	if e != nil || len(keys) != 1 {
+		t.Fatal(e)
+	}
+	original := keys[0]
+	// Reconstruct the previous lifecycle columns, then exercise the upgrade with
+	// an active certificate and an unused next certificate in the same client.
+	_, e = a.Pool.Exec(ctx, `ALTER TABLE saml_signing_keys DROP CONSTRAINT saml_signing_keys_client_id_key;
+ ALTER TABLE saml_signing_keys ADD state text NOT NULL DEFAULT 'active',ADD expires_at timestamptz NOT NULL DEFAULT now(),ADD retire_at timestamptz,ADD retired_at timestamptz;
+ ALTER TABLE saml_client_configs ADD attributes jsonb NOT NULL DEFAULT '{}', ADD key_overlap_s integer NOT NULL DEFAULT 604800;`)
+	if e != nil {
+		t.Fatal(e)
+	}
+	_, e = a.Pool.Exec(ctx, `INSERT INTO saml_signing_keys(client_id,key_ref,private_key,certificate,state) VALUES($1,'unused-next','unused-secret',$2,'next')`, c.ID, []byte("unused-certificate"))
+	if e != nil {
+		t.Fatal(e)
+	}
+	migration, e := os.ReadFile("../db/migrations/011_saml_simplify.sql")
+	if e != nil {
+		t.Fatal(e)
+	}
+	if _, e = a.Pool.Exec(ctx, string(migration)); e != nil {
+		t.Fatal(e)
+	}
+	keys, e = a.Q.SAMLKeys(ctx, c.ID)
+	if e != nil || len(keys) != 1 || !bytes.Equal(keys[0].Certificate, original.Certificate) || keys[0].PrivateKey != original.PrivateKey {
+		t.Fatal("upgrade replaced the active signing identity")
+	}
+	if e = a.createSAMLKey(ctx, a.Q, c.ID); e != nil {
+		t.Fatal(e)
+	}
+	keys, e = a.Q.SAMLKeys(ctx, c.ID)
+	if e != nil || len(keys) != 1 || !bytes.Equal(keys[0].Certificate, original.Certificate) {
+		t.Fatal("automatic generation replaced an existing certificate")
+	}
+}
+
+func samlUIDFromResponse(t *testing.T, raw []byte) string {
+	t.Helper()
+	var r saml.Response
+	if e := xml.Unmarshal(raw, &r); e != nil {
+		t.Fatal(e)
+	}
+	if r.Assertion != nil {
+		for _, statement := range r.Assertion.AttributeStatements {
+			for _, attribute := range statement.Attributes {
+				if attribute.Name == "uid" && len(attribute.Values) > 0 {
+					return attribute.Values[0].Value
+				}
+			}
+		}
+	}
+	return ""
 }

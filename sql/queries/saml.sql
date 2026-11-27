@@ -1,8 +1,8 @@
 -- name: GetSAMLConfig :one
 SELECT * FROM saml_client_configs WHERE client_id=$1;
 -- name: SaveSAMLConfig :one
-INSERT INTO saml_client_configs(client_id,entity_id,name_id_format,require_signature,attributes,launch_url,key_overlap_s)
-VALUES($1,$2,$3,$4,$5,$6,COALESCE(NULLIF(sqlc.arg(key_overlap_s)::integer,0),604800)) ON CONFLICT(client_id) DO UPDATE SET entity_id=EXCLUDED.entity_id,name_id_format=EXCLUDED.name_id_format,require_signature=EXCLUDED.require_signature,attributes=EXCLUDED.attributes,launch_url=EXCLUDED.launch_url,key_overlap_s=EXCLUDED.key_overlap_s,revision=saml_client_configs.revision+1 RETURNING *;
+INSERT INTO saml_client_configs(client_id,entity_id,name_id_format,require_signature,launch_url)
+VALUES($1,$2,$3,$4,$5) ON CONFLICT(client_id) DO UPDATE SET entity_id=EXCLUDED.entity_id,name_id_format=EXCLUDED.name_id_format,require_signature=EXCLUDED.require_signature,launch_url=EXCLUDED.launch_url,revision=saml_client_configs.revision+1 RETURNING *;
 -- name: BumpSAMLRevision :exec
 UPDATE saml_client_configs SET revision=revision+1 WHERE client_id=$1;
 -- name: SAMLACS :many
@@ -18,17 +18,12 @@ DELETE FROM saml_sp_certificates WHERE client_id=$1;
 -- name: CreateSAMLSPCertificate :exec
 INSERT INTO saml_sp_certificates(client_id,certificate) VALUES($1,$2);
 -- name: SAMLKeys :many
-SELECT * FROM saml_signing_keys WHERE client_id=$1 AND (state<>'retired' OR retire_at>now()) ORDER BY id;
+SELECT * FROM saml_signing_keys WHERE client_id=$1;
 -- name: CreateSAMLKey :one
-INSERT INTO saml_signing_keys(client_id,key_ref,private_key,certificate,state,expires_at) VALUES($1,$2,$3,$4,$5,$6) RETURNING *;
--- name: RetireSAMLKey :exec
-UPDATE saml_signing_keys SET state='retired',retired_at=now(),retire_at=now()+make_interval(secs => sqlc.arg(overlap_s)::double precision) WHERE client_id=sqlc.arg(client_id) AND state='active';
--- name: ActivateSAMLKey :execrows
-UPDATE saml_signing_keys SET state='active' WHERE client_id=$1 AND state='next' AND expires_at>now();
+INSERT INTO saml_signing_keys(client_id,key_ref,private_key,certificate) VALUES($1,$2,$3,$4)
+ON CONFLICT(client_id) DO UPDATE SET client_id=EXCLUDED.client_id RETURNING *;
 -- name: CleanSAML :exec
 DELETE FROM saml_requests WHERE expires_at<now();
--- name: EraseSAMLRetiredSecrets :exec
-UPDATE saml_signing_keys SET private_key='' WHERE state='retired' AND private_key<>'' AND retired_at<now()-interval '3 minutes';
 -- name: CreateSAMLRequest :one
 INSERT INTO saml_requests(client_id,request_id,token_hash,browser_hash,revision,request,expires_at)
 SELECT $1,$2,$3,$4,$5,$6,$7 WHERE (SELECT count(*) FROM saml_requests WHERE expires_at>now() AND consumed_at IS NULL)<10000 AND (SELECT count(*) FROM saml_requests WHERE client_id=$1 AND expires_at>now() AND consumed_at IS NULL)<500 AND (SELECT count(*) FROM saml_requests WHERE browser_hash=$4 AND expires_at>now() AND consumed_at IS NULL)<20

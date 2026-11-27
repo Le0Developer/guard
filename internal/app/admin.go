@@ -111,7 +111,6 @@ func (a *App) registerAdmin(mux *http.ServeMux) {
 	bind("GET /admin", a.adminHome)
 	bind("GET /admin/clients/{id}/saml", a.adminSAML)
 	bind("POST /admin/clients/{id}/saml", a.adminSAMLWrite)
-	bind("POST /admin/clients/{id}/saml/keys/{action}", a.adminSAMLWrite)
 	bind("GET /admin/clients/{id}/saml/certificates/{key_id}", a.adminSAMLCertificate)
 	bind("GET /admin/clients/{id}/scim", a.adminSCIM)
 	bind("POST /admin/clients/{id}/scim", a.adminSCIMSave)

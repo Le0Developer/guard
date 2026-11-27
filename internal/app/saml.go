@@ -377,36 +377,24 @@ func (a *App) samlIssue(w http.ResponseWriter, r *http.Request) {
 				// It does not claim to know when an upstream provider authenticated.
 				in.AuthTime = actor.Session.CreatedAt
 				in.SessionExpiry = minTime(actor.Session.ExpiresAt, in.Now.Add(time.Duration(c.SessionLifetimeS)*time.Second))
-				in.Attributes = map[string][]string{}
-				var mapping map[string]string
-				if e = json.Unmarshal(cfg.Attributes, &mapping); e != nil {
+				// Attribute identity is stable regardless of NameID policy or mapping creation.
+				uidValue := a.oidcSubject(c, actor.User.ID)
+				in.Attributes = map[string][]string{"uid": {uidValue}, "username": {actor.User.Username}, "email": {actor.User.Email}, "groups": {}}
+				members, e := q.GroupMembersByUserId(r.Context(), actor.User.ID)
+				if e != nil {
 					return e
 				}
-				for source, name := range mapping {
-					switch source {
-					case "uid":
-						in.Attributes[name] = []string{subject}
-					case "username":
-						in.Attributes[name] = []string{actor.User.Username}
-					case "email":
-						in.Attributes[name] = []string{actor.User.Email}
-					case "groups":
-						members, e := q.GroupMembersByUserId(r.Context(), actor.User.ID)
-						if e != nil {
-							return e
-						}
-						for _, m := range members {
-							g, e := q.GetGroup(r.Context(), m.GroupID)
-							if e != nil {
-								return e
-							}
-							if g.DeletedAt == nil {
-								in.Attributes[name] = append(in.Attributes[name], g.Name)
-							}
-						}
-						sort.Strings(in.Attributes[name])
+				for _, m := range members {
+					g, e := q.GetGroup(r.Context(), m.GroupID)
+					if e != nil {
+						return e
+					}
+					if g.DeletedAt == nil {
+						in.Attributes["groups"] = append(in.Attributes["groups"], g.Name)
 					}
 				}
+				sort.Strings(in.Attributes["groups"])
+
 			}
 		}
 		in.Now = time.Now().UTC()

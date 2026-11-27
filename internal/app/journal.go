@@ -389,7 +389,7 @@ func (a *App) Background(ctx context.Context) {
 }
 func (a *App) cleanup(ctx context.Context) error {
 	return transaction(ctx, a.Pool, func(q *db.Queries) error {
-		for _, fn := range []func(context.Context) error{q.CleanSAML, q.EraseSAMLRetiredSecrets, q.DeleteExpiredUpstreamLogoutEvents, q.DeleteExpiredCeremonies, q.DeleteExpiredForwardRequests, q.DeleteExpiredForwardSessions, q.DeleteExpiredOAuthTokens, q.DeleteExpiredCodes, q.DeleteExpiredKeys, q.DeleteExpiredLogins, q.DeleteExpiredSessions} {
+		for _, fn := range []func(context.Context) error{q.CleanSAML, q.DeleteExpiredUpstreamLogoutEvents, q.DeleteExpiredCeremonies, q.DeleteExpiredForwardRequests, q.DeleteExpiredForwardSessions, q.DeleteExpiredOAuthTokens, q.DeleteExpiredCodes, q.DeleteExpiredKeys, q.DeleteExpiredLogins, q.DeleteExpiredSessions} {
 			if err := fn(ctx); err != nil {
 				return err
 			}

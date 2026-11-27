@@ -193,8 +193,8 @@ Both response and assertion are RSA-SHA256 signed. Existing login providers, MFA
 and client group rules apply. For first use of a persistent NameID, the SP must
 send `NameIDPolicy AllowCreate="true"`. Email NameID requires a valid email
 belonging to exactly one active account; changing it can change the application's
-account association. Attribute release is opt-in: name the username, email,
-persistent identifier and groups attributes you need; leave others blank.
+account association. Guard sends `uid`, `username`, `email` and the user's active
+`groups` using fixed attribute names. Empty optional values are omitted.
 
 To require signed requests, enable that option and paste the SP's RSA signing
 certificate(s). Supplied signatures are always verified. ForceAuthn requires a
@@ -210,13 +210,15 @@ terminate an existing application session: SAML Single Logout is not supported.
 There are no unsolicited responses, encrypted assertions or upstream SAML login.
 The optional application login URL lets the launcher start SSO through the SP.
 
-Each client gets an encrypted signing key and one-year certificate. Back up the
-database together with `MFA_ENCRYPTION_KEY`. Prepare the next certificate, import
-it into the SP or refresh its trusted metadata, then confirm activation in Guard.
-Retired public certificates remain published for the configured overlap (seven
-days by default); retired private material is erased after three minutes. Expired
-active certificates block issuance. Configuration changes invalidate pending
-requests. If delivery fails after issuance, start a new request from the SP.
+Each SAML client automatically gets one signing certificate and an encrypted
+private key when created. The certificate remains stable when settings change;
+there are no rotation controls or certificate-expiry checks in Guard. New
+certificates use the X.509 no-expiration date (year 9999). Back up the database
+together with `MFA_ENCRYPTION_KEY`. Upgrades preserve existing certificates,
+including their encoded validity dates; applications may enforce those dates
+independently. Import the certificate or Guard metadata into
+the application. Configuration changes invalidate pending requests. If delivery
+fails after issuance, start a new request from the SP.
 
 ### SCIM provisioning
 

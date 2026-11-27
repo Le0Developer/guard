@@ -67,6 +67,9 @@ func (a *App) adminWriteClient(w http.ResponseWriter, r *http.Request, actor *id
 		if id == 0 {
 			c, e = q.CreateClient(r.Context(), db.CreateClientParams{Name: name, Slug: security.Token(), ClientID: security.Token(), ClientSecret: security.Token(), ClientType: kind, SessionLifetimeS: int32(lifetime), RequirePkce: kind != "Saml" && r.PostForm.Has("require_pkce"), DetailedLogging: r.PostForm.Has("detailed_logging"), AllowEventReports: kind != "Saml" && r.PostForm.Has("allow_event_reports"), DeletedAt: nil})
 			id = c.ID
+			if e == nil && kind == "Saml" {
+				e = a.createSAMLKey(r.Context(), q, id)
+			}
 		} else {
 			p := adminClientParams(c)
 			p.Name = name

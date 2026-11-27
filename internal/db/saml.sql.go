@@ -12,18 +12,6 @@ import (
 	"github.com/le0developer/guard/internal/ids"
 )
 
-const activateSAMLKey = `-- name: ActivateSAMLKey :execrows
-UPDATE saml_signing_keys SET state='active' WHERE client_id=$1 AND state='next' AND expires_at>now()
-`
-
-func (q *Queries) ActivateSAMLKey(ctx context.Context, clientID ids.ClientID) (int64, error) {
-	result, err := q.db.Exec(ctx, activateSAMLKey, clientID)
-	if err != nil {
-		return 0, err
-	}
-	return result.RowsAffected(), nil
-}
-
 const bumpSAMLRevision = `-- name: BumpSAMLRevision :exec
 UPDATE saml_client_configs SET revision=revision+1 WHERE client_id=$1
 `
@@ -73,7 +61,8 @@ func (q *Queries) CreateSAMLACS(ctx context.Context, arg CreateSAMLACSParams) er
 }
 
 const createSAMLKey = `-- name: CreateSAMLKey :one
-INSERT INTO saml_signing_keys(client_id,key_ref,private_key,certificate,state,expires_at) VALUES($1,$2,$3,$4,$5,$6) RETURNING id, client_id, key_ref, private_key, certificate, state, expires_at, retire_at, retired_at, created_at
+INSERT INTO saml_signing_keys(client_id,key_ref,private_key,certificate) VALUES($1,$2,$3,$4)
+ON CONFLICT(client_id) DO UPDATE SET client_id=EXCLUDED.client_id RETURNING id, client_id, key_ref, private_key, certificate, created_at
 `
 
 type CreateSAMLKeyParams struct {
@@ -81,8 +70,6 @@ type CreateSAMLKeyParams struct {
 	KeyRef      string       `json:"key_ref"`
 	PrivateKey  string       `json:"private_key"`
 	Certificate []byte       `json:"certificate"`
-	State       string       `json:"state"`
-	ExpiresAt   time.Time    `json:"expires_at"`
 }
 
 func (q *Queries) CreateSAMLKey(ctx context.Context, arg CreateSAMLKeyParams) (SamlSigningKey, error) {
@@ -91,8 +78,6 @@ func (q *Queries) CreateSAMLKey(ctx context.Context, arg CreateSAMLKeyParams) (S
 		arg.KeyRef,
 		arg.PrivateKey,
 		arg.Certificate,
-		arg.State,
-		arg.ExpiresAt,
 	)
 	var i SamlSigningKey
 	err := row.Scan(
@@ -101,10 +86,6 @@ func (q *Queries) CreateSAMLKey(ctx context.Context, arg CreateSAMLKeyParams) (S
 		&i.KeyRef,
 		&i.PrivateKey,
 		&i.Certificate,
-		&i.State,
-		&i.ExpiresAt,
-		&i.RetireAt,
-		&i.RetiredAt,
 		&i.CreatedAt,
 	)
 	return i, err
@@ -201,17 +182,8 @@ func (q *Queries) DeleteSAMLSPCertificates(ctx context.Context, clientID ids.Cli
 	return err
 }
 
-const eraseSAMLRetiredSecrets = `-- name: EraseSAMLRetiredSecrets :exec
-UPDATE saml_signing_keys SET private_key='' WHERE state='retired' AND private_key<>'' AND retired_at<now()-interval '3 minutes'
-`
-
-func (q *Queries) EraseSAMLRetiredSecrets(ctx context.Context) error {
-	_, err := q.db.Exec(ctx, eraseSAMLRetiredSecrets)
-	return err
-}
-
 const getSAMLConfig = `-- name: GetSAMLConfig :one
-SELECT client_id, revision, entity_id, name_id_format, require_signature, attributes, launch_url, key_overlap_s FROM saml_client_configs WHERE client_id=$1
+SELECT client_id, revision, entity_id, name_id_format, require_signature, launch_url FROM saml_client_configs WHERE client_id=$1
 `
 
 func (q *Queries) GetSAMLConfig(ctx context.Context, clientID ids.ClientID) (SamlClientConfig, error) {
@@ -223,9 +195,7 @@ func (q *Queries) GetSAMLConfig(ctx context.Context, clientID ids.ClientID) (Sam
 		&i.EntityID,
 		&i.NameIDFormat,
 		&i.RequireSignature,
-		&i.Attributes,
 		&i.LaunchUrl,
-		&i.KeyOverlapS,
 	)
 	return i, err
 }
@@ -338,20 +308,6 @@ func (q *Queries) RecordSAMLAuthentication(ctx context.Context, arg RecordSAMLAu
 	return err
 }
 
-const retireSAMLKey = `-- name: RetireSAMLKey :exec
-UPDATE saml_signing_keys SET state='retired',retired_at=now(),retire_at=now()+make_interval(secs => $1::double precision) WHERE client_id=$2 AND state='active'
-`
-
-type RetireSAMLKeyParams struct {
-	OverlapS float64      `json:"overlap_s"`
-	ClientID ids.ClientID `json:"client_id"`
-}
-
-func (q *Queries) RetireSAMLKey(ctx context.Context, arg RetireSAMLKeyParams) error {
-	_, err := q.db.Exec(ctx, retireSAMLKey, arg.OverlapS, arg.ClientID)
-	return err
-}
-
 const sAMLACS = `-- name: SAMLACS :many
 SELECT id, client_id, endpoint_index, url, is_default FROM saml_acs_endpoints WHERE client_id=$1 ORDER BY endpoint_index
 `
@@ -383,7 +339,7 @@ func (q *Queries) SAMLACS(ctx context.Context, clientID ids.ClientID) ([]SamlAcs
 }
 
 const sAMLKeys = `-- name: SAMLKeys :many
-SELECT id, client_id, key_ref, private_key, certificate, state, expires_at, retire_at, retired_at, created_at FROM saml_signing_keys WHERE client_id=$1 AND (state<>'retired' OR retire_at>now()) ORDER BY id
+SELECT id, client_id, key_ref, private_key, certificate, created_at FROM saml_signing_keys WHERE client_id=$1
 `
 
 func (q *Queries) SAMLKeys(ctx context.Context, clientID ids.ClientID) ([]SamlSigningKey, error) {
@@ -401,10 +357,6 @@ func (q *Queries) SAMLKeys(ctx context.Context, clientID ids.ClientID) ([]SamlSi
 			&i.KeyRef,
 			&i.PrivateKey,
 			&i.Certificate,
-			&i.State,
-			&i.ExpiresAt,
-			&i.RetireAt,
-			&i.RetiredAt,
 			&i.CreatedAt,
 		); err != nil {
 			return nil, err
@@ -464,8 +416,8 @@ func (q *Queries) SAMLSession(ctx context.Context, arg SAMLSessionParams) (SamlS
 }
 
 const saveSAMLConfig = `-- name: SaveSAMLConfig :one
-INSERT INTO saml_client_configs(client_id,entity_id,name_id_format,require_signature,attributes,launch_url,key_overlap_s)
-VALUES($1,$2,$3,$4,$5,$6,COALESCE(NULLIF($7::integer,0),604800)) ON CONFLICT(client_id) DO UPDATE SET entity_id=EXCLUDED.entity_id,name_id_format=EXCLUDED.name_id_format,require_signature=EXCLUDED.require_signature,attributes=EXCLUDED.attributes,launch_url=EXCLUDED.launch_url,key_overlap_s=EXCLUDED.key_overlap_s,revision=saml_client_configs.revision+1 RETURNING client_id, revision, entity_id, name_id_format, require_signature, attributes, launch_url, key_overlap_s
+INSERT INTO saml_client_configs(client_id,entity_id,name_id_format,require_signature,launch_url)
+VALUES($1,$2,$3,$4,$5) ON CONFLICT(client_id) DO UPDATE SET entity_id=EXCLUDED.entity_id,name_id_format=EXCLUDED.name_id_format,require_signature=EXCLUDED.require_signature,launch_url=EXCLUDED.launch_url,revision=saml_client_configs.revision+1 RETURNING client_id, revision, entity_id, name_id_format, require_signature, launch_url
 `
 
 type SaveSAMLConfigParams struct {
@@ -473,9 +425,7 @@ type SaveSAMLConfigParams struct {
 	EntityID         string       `json:"entity_id"`
 	NameIDFormat     string       `json:"name_id_format"`
 	RequireSignature bool         `json:"require_signature"`
-	Attributes       []byte       `json:"attributes"`
 	LaunchUrl        string       `json:"launch_url"`
-	KeyOverlapS      int32        `json:"key_overlap_s"`
 }
 
 func (q *Queries) SaveSAMLConfig(ctx context.Context, arg SaveSAMLConfigParams) (SamlClientConfig, error) {
@@ -484,9 +434,7 @@ func (q *Queries) SaveSAMLConfig(ctx context.Context, arg SaveSAMLConfigParams) 
 		arg.EntityID,
 		arg.NameIDFormat,
 		arg.RequireSignature,
-		arg.Attributes,
 		arg.LaunchUrl,
-		arg.KeyOverlapS,
 	)
 	var i SamlClientConfig
 	err := row.Scan(
@@ -495,9 +443,7 @@ func (q *Queries) SaveSAMLConfig(ctx context.Context, arg SaveSAMLConfigParams) 
 		&i.EntityID,
 		&i.NameIDFormat,
 		&i.RequireSignature,
-		&i.Attributes,
 		&i.LaunchUrl,
-		&i.KeyOverlapS,
 	)
 	return i, err
 }

@@ -28,7 +28,7 @@ func randomID() string {
 	return "_" + hex.EncodeToString(b[:])
 }
 func Response(in ResponseInput, key *rsa.PrivateKey, cert *x509.Certificate) ([]byte, error) {
-	if key == nil || cert == nil || in.Now.Before(cert.NotBefore) || !in.Now.Before(cert.NotAfter) {
+	if key == nil || cert == nil {
 		return nil, errors.New("no valid SAML signing key")
 	}
 	ctx, err := dsig.NewSigningContext(key, [][]byte{cert.Raw})

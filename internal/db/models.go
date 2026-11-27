@@ -233,9 +233,7 @@ type SamlClientConfig struct {
 	EntityID         string       `json:"entity_id"`
 	NameIDFormat     string       `json:"name_id_format"`
 	RequireSignature bool         `json:"require_signature"`
-	Attributes       []byte       `json:"attributes"`
 	LaunchUrl        string       `json:"launch_url"`
-	KeyOverlapS      int32        `json:"key_overlap_s"`
 }
 
 type SamlRequest struct {
@@ -264,10 +262,6 @@ type SamlSigningKey struct {
 	KeyRef      string               `json:"key_ref"`
 	PrivateKey  string               `json:"private_key"`
 	Certificate []byte               `json:"certificate"`
-	State       string               `json:"state"`
-	ExpiresAt   time.Time            `json:"expires_at"`
-	RetireAt    *time.Time           `json:"retire_at"`
-	RetiredAt   *time.Time           `json:"retired_at"`
 	CreatedAt   time.Time            `json:"created_at"`
 }
 

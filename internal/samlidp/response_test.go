@@ -53,3 +53,23 @@ func TestSignedResponse(t *testing.T) {
 		t.Fatal("identity/correlation")
 	}
 }
+
+func TestSigningDoesNotEnforceCertificateExpiry(t *testing.T) {
+	key, e := rsa.GenerateKey(rand.Reader, 2048)
+	if e != nil {
+		t.Fatal(e)
+	}
+	now := time.Now().UTC()
+	tmpl := &x509.Certificate{SerialNumber: big.NewInt(2), NotBefore: now.Add(-2 * time.Hour), NotAfter: now.Add(-time.Hour)}
+	der, e := x509.CreateCertificate(rand.Reader, tmpl, tmpl, &key.PublicKey, key)
+	if e != nil {
+		t.Fatal(e)
+	}
+	cert, e := x509.ParseCertificate(der)
+	if e != nil {
+		t.Fatal(e)
+	}
+	if _, e = Response(ResponseInput{Issuer: "guard", Audience: "sp", Request: Request{ID: "_expiredcert", ACS: "https://sp/acs", NameID: Persistent}, Subject: "user", Now: now, AuthTime: now, SessionExpiry: now.Add(time.Hour)}, key, cert); e != nil {
+		t.Fatal(e)
+	}
+}

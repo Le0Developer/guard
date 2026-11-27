@@ -35,7 +35,7 @@ func (a *App) samlKeySeal(client ids.ClientID, ref string, data []byte, open boo
 	}
 	return c.Seal(n, n, data, aad), nil
 }
-func (a *App) createSAMLKey(ctx context.Context, q *db.Queries, client ids.ClientID, state string) error {
+func (a *App) createSAMLKey(ctx context.Context, q *db.Queries, client ids.ClientID) error {
 	key, e := rsa.GenerateKey(rand.Reader, 3072)
 	if e != nil {
 		return e
@@ -45,7 +45,7 @@ func (a *App) createSAMLKey(ctx context.Context, q *db.Queries, client ids.Clien
 	if e != nil {
 		return e
 	}
-	template := &x509.Certificate{SerialNumber: serial, Subject: pkix.Name{CommonName: "Guard SAML signing"}, NotBefore: now.Add(-time.Minute), NotAfter: now.AddDate(1, 0, 0), KeyUsage: x509.KeyUsageDigitalSignature, BasicConstraintsValid: true}
+	template := &x509.Certificate{SerialNumber: serial, Subject: pkix.Name{CommonName: "Guard SAML signing"}, NotBefore: now.Add(-time.Minute), NotAfter: time.Date(9999, time.December, 31, 23, 59, 59, 0, time.UTC), KeyUsage: x509.KeyUsageDigitalSignature, BasicConstraintsValid: true}
 	der, e := x509.CreateCertificate(rand.Reader, template, template, &key.PublicKey, key)
 	if e != nil {
 		return e
@@ -55,7 +55,7 @@ func (a *App) createSAMLKey(ctx context.Context, q *db.Queries, client ids.Clien
 	if e != nil {
 		return e
 	}
-	_, e = q.CreateSAMLKey(ctx, db.CreateSAMLKeyParams{ClientID: client, KeyRef: ref, PrivateKey: base64.RawURLEncoding.EncodeToString(sealed), Certificate: der, State: state, ExpiresAt: template.NotAfter})
+	_, e = q.CreateSAMLKey(ctx, db.CreateSAMLKeyParams{ClientID: client, KeyRef: ref, PrivateKey: base64.RawURLEncoding.EncodeToString(sealed), Certificate: der})
 	return e
 }
 func (a *App) samlSigningKey(ctx context.Context, q *db.Queries, client ids.ClientID) (*rsa.PrivateKey, *x509.Certificate, error) {
@@ -64,15 +64,9 @@ func (a *App) samlSigningKey(ctx context.Context, q *db.Queries, client ids.Clie
 		return nil, nil, e
 	}
 	for _, k := range keys {
-		if k.State != "active" {
-			continue
-		}
 		cert, e := x509.ParseCertificate(k.Certificate)
 		if e != nil {
 			return nil, nil, e
-		}
-		if time.Now().Before(cert.NotBefore) || !time.Now().Before(cert.NotAfter) {
-			return nil, nil, errors.New("SAML signing certificate expired or not yet valid")
 		}
 		b, e := base64.RawURLEncoding.DecodeString(k.PrivateKey)
 		if e != nil {
