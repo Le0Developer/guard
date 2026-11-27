@@ -167,6 +167,11 @@ func (a *App) permitted(ctx context.Context, q *db.Queries, client ids.ClientID,
 	return chosen != nil && chosen.AccessControl == "Allow", nil
 }
 func (a *App) sessionByID(ctx context.Context, q *db.Queries, id ids.SessionID) (*identity, error) {
+	return a.browserSessionByID(ctx, q, id, false)
+}
+
+// Only the browser reset flow may use a session while a password reset is required.
+func (a *App) browserSessionByID(ctx context.Context, q *db.Queries, id ids.SessionID, allowPasswordReset bool) (*identity, error) {
 	s, err := q.GetSession(ctx, id)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, nil
@@ -181,7 +186,7 @@ func (a *App) sessionByID(ctx context.Context, q *db.Queries, id ids.SessionID) 
 	if err != nil {
 		return nil, err
 	}
-	if u.Disabled || u.DeletedAt != nil {
+	if u.Disabled || u.DeletedAt != nil || u.ForcePasswordReset && !allowPasswordReset {
 		return nil, nil
 	}
 	return &identity{u, s}, nil

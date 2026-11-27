@@ -69,6 +69,7 @@ func (a *App) adminWrite(w http.ResponseWriter, r *http.Request, actor *identity
 	}
 	username, email := strings.TrimSpace(r.PostForm.Get("username")), strings.TrimSpace(r.PostForm.Get("email"))
 	disabled := r.PostForm.Has("disabled")
+	forcePasswordReset := r.PostForm.Has("force_password_reset")
 	if err = adminRequired(username, "Username", 128); err != nil {
 		return err
 	}
@@ -100,7 +101,7 @@ func (a *App) adminWrite(w http.ResponseWriter, r *http.Request, actor *identity
 	}
 	err = a.adminMutation(r, actor, func() any { return id }, func(q *db.Queries) error {
 		if raw == "" {
-			u, e := q.CreateUser(ctx, db.CreateUserParams{Username: username, Email: email, Password: hash, Role: role, Disabled: disabled, MfaRevision: 0, MfaFailures: 0, MfaWindow: nil, WebauthnUserID: []byte(security.Token()), DeletedAt: nil})
+			u, e := q.CreateUser(ctx, db.CreateUserParams{ForcePasswordReset: forcePasswordReset, Username: username, Email: email, Password: hash, Role: role, Disabled: disabled, MfaRevision: 0, MfaFailures: 0, MfaWindow: nil, WebauthnUserID: []byte(security.Token()), DeletedAt: nil})
 			id = u.ID
 			return e
 		}
@@ -112,10 +113,11 @@ func (a *App) adminWrite(w http.ResponseWriter, r *http.Request, actor *identity
 		p.Username = username
 		p.Email = email
 		p.Disabled = disabled
+		p.ForcePasswordReset = forcePasswordReset
 		if _, e = q.UpdateUser(ctx, p); e != nil {
 			return e
 		}
-		if disabled {
+		if disabled || forcePasswordReset && !u.ForcePasswordReset {
 			return adminRevokeUser(ctx, q, id)
 		}
 		return nil
@@ -170,6 +172,7 @@ func (a *App) adminUserAction(w http.ResponseWriter, r *http.Request, actor *ide
 		p := adminUserParams(u)
 		if action == "password" {
 			p.Password = hash
+			p.ForcePasswordReset = r.PostForm.Has("force_password_reset")
 		} else {
 			role := r.PostForm.Get("role")
 			if role != "Admin" && role != "User" {

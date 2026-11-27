@@ -78,3 +78,6 @@ var userinfoSimulatorTemplate string
 
 //go:embed templates/admin-saml.html
 var adminSAMLTemplate string
+
+//go:embed templates/password-reset.html
+var passwordResetTemplate string

@@ -11,10 +11,10 @@ SELECT * FROM users ORDER BY id;
 DELETE FROM users WHERE id = sqlc.arg(id);
 
 -- name: CreateUser :one
-INSERT INTO users (username, email, password, role, disabled, mfa_revision, mfa_failures, mfa_window, webauthn_user_id, deleted_at) VALUES (sqlc.arg(username), sqlc.arg(email), sqlc.arg(password), sqlc.arg(role), sqlc.arg(disabled), sqlc.arg(mfa_revision), sqlc.arg(mfa_failures), sqlc.narg(mfa_window), sqlc.arg(webauthn_user_id), sqlc.narg(deleted_at)) RETURNING *;
+INSERT INTO users (username, email, force_password_reset, password, role, disabled, mfa_revision, mfa_failures, mfa_window, webauthn_user_id, deleted_at) VALUES (sqlc.arg(username), sqlc.arg(email), sqlc.arg(force_password_reset), sqlc.arg(password), sqlc.arg(role), sqlc.arg(disabled), sqlc.arg(mfa_revision), sqlc.arg(mfa_failures), sqlc.narg(mfa_window), sqlc.arg(webauthn_user_id), sqlc.narg(deleted_at)) RETURNING *;
 
 -- name: UpdateUser :one
-UPDATE users SET username = sqlc.arg(username), email = sqlc.arg(email), password = sqlc.arg(password), role = sqlc.arg(role), disabled = sqlc.arg(disabled), mfa_revision = sqlc.arg(mfa_revision), mfa_failures = sqlc.arg(mfa_failures), mfa_window = sqlc.narg(mfa_window), webauthn_user_id = sqlc.arg(webauthn_user_id), deleted_at = sqlc.narg(deleted_at), updated_at = now() WHERE id = sqlc.arg(id) RETURNING *;
+UPDATE users SET force_password_reset = sqlc.arg(force_password_reset), username = sqlc.arg(username), email = sqlc.arg(email), password = sqlc.arg(password), role = sqlc.arg(role), disabled = sqlc.arg(disabled), mfa_revision = sqlc.arg(mfa_revision), mfa_failures = sqlc.arg(mfa_failures), mfa_window = sqlc.narg(mfa_window), webauthn_user_id = sqlc.arg(webauthn_user_id), deleted_at = sqlc.narg(deleted_at), updated_at = now() WHERE id = sqlc.arg(id) RETURNING *;
 
 -- name: UserByUsername :one
 SELECT * FROM users WHERE username = sqlc.arg(username);

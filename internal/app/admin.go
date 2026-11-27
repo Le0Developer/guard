@@ -184,7 +184,7 @@ func adminClient(ctx context.Context, q *db.Queries, id ids.ClientID, lock bool)
 	return u, err
 }
 func adminUserParams(u db.User) db.UpdateUserParams {
-	return db.UpdateUserParams{ID: u.ID, Username: u.Username, Email: u.Email, Password: u.Password, Role: u.Role, Disabled: u.Disabled, MfaRevision: u.MfaRevision, MfaFailures: u.MfaFailures, MfaWindow: u.MfaWindow, WebauthnUserID: u.WebauthnUserID, DeletedAt: u.DeletedAt}
+	return db.UpdateUserParams{ForcePasswordReset: u.ForcePasswordReset, ID: u.ID, Username: u.Username, Email: u.Email, Password: u.Password, Role: u.Role, Disabled: u.Disabled, MfaRevision: u.MfaRevision, MfaFailures: u.MfaFailures, MfaWindow: u.MfaWindow, WebauthnUserID: u.WebauthnUserID, DeletedAt: u.DeletedAt}
 }
 func adminClientParams(c db.Client) db.UpdateClientParams {
 	return db.UpdateClientParams{ID: c.ID, Name: c.Name, Slug: c.Slug, ClientType: c.ClientType, ClientID: c.ClientID, ClientSecret: c.ClientSecret, SessionLifetimeS: c.SessionLifetimeS, RequirePkce: c.RequirePkce, DetailedLogging: c.DetailedLogging, AllowEventReports: c.AllowEventReports, DeletedAt: c.DeletedAt}

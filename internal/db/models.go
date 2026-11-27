@@ -392,19 +392,20 @@ type UpstreamSession struct {
 }
 
 type User struct {
-	ID             ids.UserID `json:"id"`
-	Username       string     `json:"username"`
-	Email          string     `json:"email"`
-	Password       string     `json:"password"`
-	Role           string     `json:"role"`
-	Disabled       bool       `json:"disabled"`
-	MfaRevision    int64      `json:"mfa_revision"`
-	MfaFailures    int32      `json:"mfa_failures"`
-	MfaWindow      *time.Time `json:"mfa_window"`
-	WebauthnUserID []byte     `json:"webauthn_user_id"`
-	CreatedAt      time.Time  `json:"created_at"`
-	UpdatedAt      time.Time  `json:"updated_at"`
-	DeletedAt      *time.Time `json:"deleted_at"`
+	ID                 ids.UserID `json:"id"`
+	Username           string     `json:"username"`
+	Email              string     `json:"email"`
+	Password           string     `json:"password"`
+	Role               string     `json:"role"`
+	Disabled           bool       `json:"disabled"`
+	MfaRevision        int64      `json:"mfa_revision"`
+	MfaFailures        int32      `json:"mfa_failures"`
+	MfaWindow          *time.Time `json:"mfa_window"`
+	WebauthnUserID     []byte     `json:"webauthn_user_id"`
+	CreatedAt          time.Time  `json:"created_at"`
+	UpdatedAt          time.Time  `json:"updated_at"`
+	DeletedAt          *time.Time `json:"deleted_at"`
+	ForcePasswordReset bool       `json:"force_password_reset"`
 }
 
 type WebauthnCredential struct {

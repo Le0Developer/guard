@@ -20,6 +20,10 @@
     <input name="disabled" type="checkbox" {{if .Data.Target.Disabled}}checked{{end}}>
     Disable this account
   </label>
+  <label>
+    <input name="force_password_reset" type="checkbox" {{if .Data.Target.ForcePasswordReset}}checked{{end}}>
+    Force password reset on next login
+  </label>
   <button class="btn btn-info">Save details</button>
 </form>
 {{if not .Data.New}}

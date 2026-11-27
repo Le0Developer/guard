@@ -12,7 +12,7 @@ import (
 )
 
 const bootstrapUser = `-- name: BootstrapUser :one
-INSERT INTO users (id, username, password, role, webauthn_user_id) VALUES (0, 'system', $1, 'Admin', $2) ON CONFLICT (id) DO NOTHING RETURNING id, username, email, password, role, disabled, mfa_revision, mfa_failures, mfa_window, webauthn_user_id, created_at, updated_at, deleted_at
+INSERT INTO users (id, username, password, role, webauthn_user_id, force_password_reset) VALUES (0, 'system', $1, 'Admin', $2, true) ON CONFLICT (id) DO NOTHING RETURNING id, username, email, password, role, disabled, mfa_revision, mfa_failures, mfa_window, webauthn_user_id, created_at, updated_at, deleted_at, force_password_reset
 `
 
 type BootstrapUserParams struct {
@@ -37,6 +37,7 @@ func (q *Queries) BootstrapUser(ctx context.Context, arg BootstrapUserParams) (U
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.DeletedAt,
+		&i.ForcePasswordReset,
 	)
 	return i, err
 }
@@ -143,6 +144,20 @@ func (q *Queries) DeleteExpiredSessions(ctx context.Context) error {
 	return err
 }
 
+const deleteOtherUserSessions = `-- name: DeleteOtherUserSessions :exec
+DELETE FROM sessions WHERE user_id = $1 AND id <> $2
+`
+
+type DeleteOtherUserSessionsParams struct {
+	UserID ids.UserID    `json:"user_id"`
+	ID     ids.SessionID `json:"id"`
+}
+
+func (q *Queries) DeleteOtherUserSessions(ctx context.Context, arg DeleteOtherUserSessionsParams) error {
+	_, err := q.db.Exec(ctx, deleteOtherUserSessions, arg.UserID, arg.ID)
+	return err
+}
+
 const deleteUserSessions = `-- name: DeleteUserSessions :exec
 DELETE FROM sessions WHERE user_id = $1
 `
@@ -245,7 +260,7 @@ func (q *Queries) SetSessionAuthTime(ctx context.Context, arg SetSessionAuthTime
 }
 
 const usersByEmail = `-- name: UsersByEmail :many
-SELECT id, username, email, password, role, disabled, mfa_revision, mfa_failures, mfa_window, webauthn_user_id, created_at, updated_at, deleted_at FROM users WHERE lower(email) = lower($1) AND NOT disabled AND deleted_at IS NULL LIMIT 2
+SELECT id, username, email, password, role, disabled, mfa_revision, mfa_failures, mfa_window, webauthn_user_id, created_at, updated_at, deleted_at, force_password_reset FROM users WHERE lower(email) = lower($1) AND NOT disabled AND deleted_at IS NULL LIMIT 2
 `
 
 func (q *Queries) UsersByEmail(ctx context.Context, lower string) ([]User, error) {
@@ -271,6 +286,7 @@ func (q *Queries) UsersByEmail(ctx context.Context, lower string) ([]User, error
 			&i.CreatedAt,
 			&i.UpdatedAt,
 			&i.DeletedAt,
+			&i.ForcePasswordReset,
 		); err != nil {
 			return nil, err
 		}

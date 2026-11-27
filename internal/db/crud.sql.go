@@ -1084,26 +1084,28 @@ func (q *Queries) CreateTotpAuthenticator(ctx context.Context, arg CreateTotpAut
 }
 
 const createUser = `-- name: CreateUser :one
-INSERT INTO users (username, email, password, role, disabled, mfa_revision, mfa_failures, mfa_window, webauthn_user_id, deleted_at) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING id, username, email, password, role, disabled, mfa_revision, mfa_failures, mfa_window, webauthn_user_id, created_at, updated_at, deleted_at
+INSERT INTO users (username, email, force_password_reset, password, role, disabled, mfa_revision, mfa_failures, mfa_window, webauthn_user_id, deleted_at) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING id, username, email, password, role, disabled, mfa_revision, mfa_failures, mfa_window, webauthn_user_id, created_at, updated_at, deleted_at, force_password_reset
 `
 
 type CreateUserParams struct {
-	Username       string     `json:"username"`
-	Email          string     `json:"email"`
-	Password       string     `json:"password"`
-	Role           string     `json:"role"`
-	Disabled       bool       `json:"disabled"`
-	MfaRevision    int64      `json:"mfa_revision"`
-	MfaFailures    int32      `json:"mfa_failures"`
-	MfaWindow      *time.Time `json:"mfa_window"`
-	WebauthnUserID []byte     `json:"webauthn_user_id"`
-	DeletedAt      *time.Time `json:"deleted_at"`
+	Username           string     `json:"username"`
+	Email              string     `json:"email"`
+	ForcePasswordReset bool       `json:"force_password_reset"`
+	Password           string     `json:"password"`
+	Role               string     `json:"role"`
+	Disabled           bool       `json:"disabled"`
+	MfaRevision        int64      `json:"mfa_revision"`
+	MfaFailures        int32      `json:"mfa_failures"`
+	MfaWindow          *time.Time `json:"mfa_window"`
+	WebauthnUserID     []byte     `json:"webauthn_user_id"`
+	DeletedAt          *time.Time `json:"deleted_at"`
 }
 
 func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, error) {
 	row := q.db.QueryRow(ctx, createUser,
 		arg.Username,
 		arg.Email,
+		arg.ForcePasswordReset,
 		arg.Password,
 		arg.Role,
 		arg.Disabled,
@@ -1128,6 +1130,7 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, e
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.DeletedAt,
+		&i.ForcePasswordReset,
 	)
 	return i, err
 }
@@ -2023,7 +2026,7 @@ func (q *Queries) GetTotpAuthenticator(ctx context.Context, id ids.TotpAuthentic
 }
 
 const getUser = `-- name: GetUser :one
-SELECT id, username, email, password, role, disabled, mfa_revision, mfa_failures, mfa_window, webauthn_user_id, created_at, updated_at, deleted_at FROM users WHERE id = $1
+SELECT id, username, email, password, role, disabled, mfa_revision, mfa_failures, mfa_window, webauthn_user_id, created_at, updated_at, deleted_at, force_password_reset FROM users WHERE id = $1
 `
 
 func (q *Queries) GetUser(ctx context.Context, id ids.UserID) (User, error) {
@@ -2043,6 +2046,7 @@ func (q *Queries) GetUser(ctx context.Context, id ids.UserID) (User, error) {
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.DeletedAt,
+		&i.ForcePasswordReset,
 	)
 	return i, err
 }
@@ -2682,7 +2686,7 @@ func (q *Queries) ListTotpAuthenticators(ctx context.Context) ([]TotpAuthenticat
 }
 
 const listUsers = `-- name: ListUsers :many
-SELECT id, username, email, password, role, disabled, mfa_revision, mfa_failures, mfa_window, webauthn_user_id, created_at, updated_at, deleted_at FROM users ORDER BY id
+SELECT id, username, email, password, role, disabled, mfa_revision, mfa_failures, mfa_window, webauthn_user_id, created_at, updated_at, deleted_at, force_password_reset FROM users ORDER BY id
 `
 
 func (q *Queries) ListUsers(ctx context.Context) ([]User, error) {
@@ -2708,6 +2712,7 @@ func (q *Queries) ListUsers(ctx context.Context) ([]User, error) {
 			&i.CreatedAt,
 			&i.UpdatedAt,
 			&i.DeletedAt,
+			&i.ForcePasswordReset,
 		); err != nil {
 			return nil, err
 		}
@@ -3455,7 +3460,7 @@ func (q *Queries) LockTotpAuthenticator(ctx context.Context, id ids.TotpAuthenti
 }
 
 const lockUser = `-- name: LockUser :one
-SELECT id, username, email, password, role, disabled, mfa_revision, mfa_failures, mfa_window, webauthn_user_id, created_at, updated_at, deleted_at FROM users WHERE id = $1 FOR UPDATE
+SELECT id, username, email, password, role, disabled, mfa_revision, mfa_failures, mfa_window, webauthn_user_id, created_at, updated_at, deleted_at, force_password_reset FROM users WHERE id = $1 FOR UPDATE
 `
 
 func (q *Queries) LockUser(ctx context.Context, id ids.UserID) (User, error) {
@@ -3475,12 +3480,13 @@ func (q *Queries) LockUser(ctx context.Context, id ids.UserID) (User, error) {
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.DeletedAt,
+		&i.ForcePasswordReset,
 	)
 	return i, err
 }
 
 const lockUserByUsername = `-- name: LockUserByUsername :one
-SELECT id, username, email, password, role, disabled, mfa_revision, mfa_failures, mfa_window, webauthn_user_id, created_at, updated_at, deleted_at FROM users WHERE username = $1 FOR UPDATE
+SELECT id, username, email, password, role, disabled, mfa_revision, mfa_failures, mfa_window, webauthn_user_id, created_at, updated_at, deleted_at, force_password_reset FROM users WHERE username = $1 FOR UPDATE
 `
 
 func (q *Queries) LockUserByUsername(ctx context.Context, username string) (User, error) {
@@ -3500,6 +3506,7 @@ func (q *Queries) LockUserByUsername(ctx context.Context, username string) (User
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.DeletedAt,
+		&i.ForcePasswordReset,
 	)
 	return i, err
 }
@@ -4658,25 +4665,27 @@ func (q *Queries) UpdateTotpAuthenticator(ctx context.Context, arg UpdateTotpAut
 }
 
 const updateUser = `-- name: UpdateUser :one
-UPDATE users SET username = $1, email = $2, password = $3, role = $4, disabled = $5, mfa_revision = $6, mfa_failures = $7, mfa_window = $8, webauthn_user_id = $9, deleted_at = $10, updated_at = now() WHERE id = $11 RETURNING id, username, email, password, role, disabled, mfa_revision, mfa_failures, mfa_window, webauthn_user_id, created_at, updated_at, deleted_at
+UPDATE users SET force_password_reset = $1, username = $2, email = $3, password = $4, role = $5, disabled = $6, mfa_revision = $7, mfa_failures = $8, mfa_window = $9, webauthn_user_id = $10, deleted_at = $11, updated_at = now() WHERE id = $12 RETURNING id, username, email, password, role, disabled, mfa_revision, mfa_failures, mfa_window, webauthn_user_id, created_at, updated_at, deleted_at, force_password_reset
 `
 
 type UpdateUserParams struct {
-	Username       string     `json:"username"`
-	Email          string     `json:"email"`
-	Password       string     `json:"password"`
-	Role           string     `json:"role"`
-	Disabled       bool       `json:"disabled"`
-	MfaRevision    int64      `json:"mfa_revision"`
-	MfaFailures    int32      `json:"mfa_failures"`
-	MfaWindow      *time.Time `json:"mfa_window"`
-	WebauthnUserID []byte     `json:"webauthn_user_id"`
-	DeletedAt      *time.Time `json:"deleted_at"`
-	ID             ids.UserID `json:"id"`
+	ForcePasswordReset bool       `json:"force_password_reset"`
+	Username           string     `json:"username"`
+	Email              string     `json:"email"`
+	Password           string     `json:"password"`
+	Role               string     `json:"role"`
+	Disabled           bool       `json:"disabled"`
+	MfaRevision        int64      `json:"mfa_revision"`
+	MfaFailures        int32      `json:"mfa_failures"`
+	MfaWindow          *time.Time `json:"mfa_window"`
+	WebauthnUserID     []byte     `json:"webauthn_user_id"`
+	DeletedAt          *time.Time `json:"deleted_at"`
+	ID                 ids.UserID `json:"id"`
 }
 
 func (q *Queries) UpdateUser(ctx context.Context, arg UpdateUserParams) (User, error) {
 	row := q.db.QueryRow(ctx, updateUser,
+		arg.ForcePasswordReset,
 		arg.Username,
 		arg.Email,
 		arg.Password,
@@ -4704,6 +4713,7 @@ func (q *Queries) UpdateUser(ctx context.Context, arg UpdateUserParams) (User, e
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.DeletedAt,
+		&i.ForcePasswordReset,
 	)
 	return i, err
 }
@@ -4747,7 +4757,7 @@ func (q *Queries) UpdateWebauthnCredential(ctx context.Context, arg UpdateWebaut
 }
 
 const userByUsername = `-- name: UserByUsername :one
-SELECT id, username, email, password, role, disabled, mfa_revision, mfa_failures, mfa_window, webauthn_user_id, created_at, updated_at, deleted_at FROM users WHERE username = $1
+SELECT id, username, email, password, role, disabled, mfa_revision, mfa_failures, mfa_window, webauthn_user_id, created_at, updated_at, deleted_at, force_password_reset FROM users WHERE username = $1
 `
 
 func (q *Queries) UserByUsername(ctx context.Context, username string) (User, error) {
@@ -4767,6 +4777,7 @@ func (q *Queries) UserByUsername(ctx context.Context, username string) (User, er
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.DeletedAt,
+		&i.ForcePasswordReset,
 	)
 	return i, err
 }

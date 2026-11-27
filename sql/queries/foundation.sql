@@ -14,7 +14,7 @@ SELECT * FROM users WHERE lower(email) = lower($1) AND NOT disabled AND deleted_
 DELETE FROM sessions WHERE user_id = $1;
 
 -- name: BootstrapUser :one
-INSERT INTO users (id, username, password, role, webauthn_user_id) VALUES (0, 'system', $1, 'Admin', $2) ON CONFLICT (id) DO NOTHING RETURNING *;
+INSERT INTO users (id, username, password, role, webauthn_user_id, force_password_reset) VALUES (0, 'system', $1, 'Admin', $2, true) ON CONFLICT (id) DO NOTHING RETURNING *;
 
 -- name: DeleteExpiredSessions :exec
 DELETE FROM sessions WHERE expires_at < now();
@@ -38,3 +38,6 @@ SELECT * FROM access_log_deliveries WHERE delivered_at IS NULL AND next_attempt_
 
 -- name: SetSessionAuthTime :exec
 UPDATE sessions SET auth_time = $2 WHERE id = $1;
+
+-- name: DeleteOtherUserSessions :exec
+DELETE FROM sessions WHERE user_id = $1 AND id <> $2;

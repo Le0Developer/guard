@@ -10,6 +10,10 @@
     <input id="password" name="password" type="password" minlength="8" maxlength="72" autocomplete="new-password" required>
     <label for="confirm_password">Confirm password</label>
     <input id="confirm_password" name="confirm_password" type="password" autocomplete="new-password" required>
+    <label>
+      <input name="force_password_reset" type="checkbox" {{if .Data.Target.ForcePasswordReset}}checked{{end}}>
+      Force password reset on next login
+    </label>
   {{else}}
     <p>Current role: {{.Data.Target.Role}}. Changing this role revokes all sessions.</p>
     <input type="hidden" name="current_role" value="{{.Data.Target.Role}}">

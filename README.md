@@ -55,9 +55,17 @@ not load `guard.env` itself.
 ## Initial administrator
 
 Open `DOMAIN` in your browser and sign in as `system` with the password from the
-startup logs. Create your own administrator under `/admin/users` and enroll MFA
+startup logs. You must choose a new password on first login. Create your own
+administrator under `/admin/users` and enroll MFA
 at `/security`. Sign in with the new administrator, then disable the initial
 `system` account at `/admin/users/0`.
+
+Administrators can enable **Force password reset on next login** when creating or
+editing a user, or when resetting their password. The requirement applies after
+MFA for both password and external provider sign-ins, including accounts without
+a local password. Users must set a new local password before accessing Guard or
+connected applications. Enabling the flag revokes existing sessions. Existing
+accounts are not flagged automatically during upgrades.
 
 ## Settings
 

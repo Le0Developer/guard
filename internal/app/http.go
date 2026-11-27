@@ -133,12 +133,16 @@ func (a *App) middleware(next http.Handler) http.Handler {
 		if session != "" && a.Q != nil {
 			s, err := a.Q.SessionByTokenHash(r.Context(), security.Hash(session))
 			if err == nil {
-				v, err := a.sessionByID(r.Context(), a.Q, s.ID)
+				v, err := a.browserSessionByID(r.Context(), a.Q, s.ID, true)
 				if err != nil {
 					a.serverError(w, r, err)
 					return
 				}
 				if v != nil {
+					if v.User.ForcePasswordReset && !passwordResetAllowedPath(r.URL.Path) {
+						http.Redirect(w, r, passwordResetURL(r.URL.RequestURI()), http.StatusSeeOther)
+						return
+					}
 					r = r.WithContext(context.WithValue(r.Context(), identityKey{}, v))
 				}
 			} else if !notFound(err) {
@@ -167,6 +171,8 @@ func (a *App) Handler() http.Handler {
 	mux.HandleFunc("GET /login/{method}/callback", a.upstreamCallback)
 	mux.HandleFunc("POST /login/{method}/backchannel-logout", a.upstreamBackchannelLogout)
 	mux.HandleFunc("POST /logout", a.logout)
+	mux.HandleFunc("GET /password-reset", a.passwordReset)
+	mux.HandleFunc("POST /password-reset", a.passwordReset)
 	sub, _ := fs.Sub(assets, "assets")
 	mux.Handle("GET /static/", http.StripPrefix("/static/", http.FileServerFS(sub)))
 	mux.HandleFunc("GET /saml/{slug}/metadata", a.samlMetadata)

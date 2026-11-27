@@ -252,6 +252,7 @@ func (a *App) afterPrimary(w http.ResponseWriter, r *http.Request, user db.User,
 }
 func (a *App) finishLogin(w http.ResponseWriter, r *http.Request, user db.User, login db.LoginSession) error {
 	raw := security.Token()
+	forcePasswordReset := false
 	err := transaction(r.Context(), a.Pool, func(q *db.Queries) error {
 		binding, err := lockUpstreamPending(r.Context(), q, login)
 		if err != nil {
@@ -283,6 +284,7 @@ func (a *App) finishLogin(w http.ResponseWriter, r *http.Request, user db.User, 
 		if !locked.ExpiresAt.After(time.Now()) || !security.Equal(locked.TokenHash, security.Hash(cookieValue(r, "login_session"))) {
 			return errors.New("expired login")
 		}
+		forcePasswordReset = current.ForcePasswordReset
 		issued, err := q.CreateSession(r.Context(), db.CreateSessionParams{UserID: user.ID, TokenHash: security.Hash(raw), ExpiresAt: time.Now().Add(SessionLifetime)})
 		if err != nil {
 			return err
@@ -319,7 +321,11 @@ func (a *App) finishLogin(w http.ResponseWriter, r *http.Request, user db.User, 
 	a.setCookie(w, "session", raw, int(SessionLifetime.Seconds()))
 	a.setCookie(w, "login_session", "", -1)
 	a.setCookie(w, "mfa_pending", "", -1)
-	http.Redirect(w, r, security.SafeRedirect(login.RedirectUri), 303)
+	redirect := security.SafeRedirect(login.RedirectUri)
+	if forcePasswordReset {
+		redirect = passwordResetURL(redirect)
+	}
+	http.Redirect(w, r, redirect, 303)
 	return nil
 }
 func (a *App) logout(w http.ResponseWriter, r *http.Request) {
