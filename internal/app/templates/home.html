@@ -1,13 +1,12 @@
-<section aria-labelledby="launcher-heading">
-  <h2 id="launcher-heading">App launcher</h2>
+<section aria-label="App launcher">
   {{if .Data.Apps}}
     <ul class="app-launcher">
       {{range .Data.Apps}}
         <li>
           {{if .URL}}
-            <a class="btn btn-info btn-outline" role="button" href="{{.URL}}">{{.Name}}</a>
+            <a class="app-card" href="{{.URL}}">{{.Name}}</a>
           {{else}}
-            <span class="btn btn-secondary btn-outline" aria-disabled="true" title="Launch link unavailable">{{.Name}}</span>
+            <span class="app-card" aria-disabled="true" title="Launch link unavailable">{{.Name}}</span>
           {{end}}
         </li>
       {{end}}
