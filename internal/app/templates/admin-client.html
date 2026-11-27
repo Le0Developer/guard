@@ -66,56 +66,58 @@
       <button class="btn btn-warning">Generate new secret</button>
     </form>
   </details>
-  <h2>Endpoints</h2>
-  {{if eq .Data.Target.ClientType "Oidc"}}
+  <details>
+    <summary>Endpoints</summary>
+    {{if eq .Data.Target.ClientType "Oidc"}}
+      <label>
+        Issuer
+        <input readonly value="{{.Data.Domain}}/oauth2/{{.Data.Target.Slug}}">
+      </label>
+      <label>
+        OpenID configuration
+        <input readonly value="{{.Data.Domain}}/oauth2/{{.Data.Target.Slug}}/.well-known/openid-configuration">
+      </label>
+      <label>
+        JWKS
+        <input readonly value="{{.Data.Domain}}/oauth2/{{.Data.Target.Slug}}/jwks">
+      </label>
+      <label>
+        Authorization
+        <input readonly value="{{.Data.Domain}}/oauth2/authorize">
+      </label>
+      <label>
+        Token
+        <input readonly value="{{.Data.Domain}}/oauth2/token">
+      </label>
+      <label>
+        Introspection
+        <input readonly value="{{.Data.Domain}}/oauth2/introspect">
+      </label>
+      <label>
+        Userinfo
+        <input readonly value="{{.Data.Domain}}/oauth2/userinfo">
+      </label>
+      <label>
+        Revocation
+        <input readonly value="{{.Data.Domain}}/oauth2/revoke">
+      </label>
+    {{else}}
+      <p>Configure your reverse proxy to use Guard's private ForwardAuth endpoint and this client ID.</p>
+    {{end}}
     <label>
-      Issuer
-      <input readonly value="{{.Data.Domain}}/oauth2/{{.Data.Target.Slug}}">
+      Application events
+      <input readonly value="{{.Data.Domain}}/oauth2/event">
     </label>
-    <label>
-      OpenID configuration
-      <input readonly value="{{.Data.Domain}}/oauth2/{{.Data.Target.Slug}}/.well-known/openid-configuration">
-    </label>
-    <label>
-      JWKS
-      <input readonly value="{{.Data.Domain}}/oauth2/{{.Data.Target.Slug}}/jwks">
-    </label>
-    <label>
-      Authorization
-      <input readonly value="{{.Data.Domain}}/oauth2/authorize">
-    </label>
-    <label>
-      Token
-      <input readonly value="{{.Data.Domain}}/oauth2/token">
-    </label>
-    <label>
-      Introspection
-      <input readonly value="{{.Data.Domain}}/oauth2/introspect">
-    </label>
-    <label>
-      Userinfo
-      <input readonly value="{{.Data.Domain}}/oauth2/userinfo">
-    </label>
-    <label>
-      Revocation
-      <input readonly value="{{.Data.Domain}}/oauth2/revoke">
-    </label>
-  {{else}}
-    <p>Configure your reverse proxy to use Guard's private ForwardAuth endpoint and this client ID.</p>
-  {{end}}
-  <label>
-    Application events
-    <input readonly value="{{.Data.Domain}}/oauth2/event">
-  </label>
+  </details>
   <hr>
-  <section id="redirect-uris">
-    <h2>
+  <details id="redirect-uris">
+    <summary>
       {{if eq .Data.Target.ClientType "ForwardAuth"}}
         Allowed origins
       {{else}}
         Redirect URIs
       {{end}}
-    </h2>
+    </summary>
     {{range .Data.Redirects}}
       <form class="redirect-uri-row" method="post" action="/admin/clients/{{$.Data.Target.ID}}/redirects/{{.ID}}">
         {{template "csrf" $}}
@@ -146,66 +148,68 @@
       </small>
       <button class="btn btn-info">Add URI</button>
     </form>
-  </section>
+  </details>
   <hr>
-  <h2>Group access rules</h2>
-  <p>Lower priority numbers win; Deny wins a tie. Without rules all users have access. With rules, users require a matching Allow.</p>
-  <div class="overflow-auto">
-    <table class="table-striped">
-      <thead>
-        <tr>
-          <th>Group</th>
-          <th>Priority</th>
-          <th>Decision</th>
-          <th>Action</th>
-        </tr>
-      </thead>
-      <tbody>
-        {{range .Data.Rules}}
+  <details>
+    <summary>Group access rules</summary>
+    <p>Lower priority numbers win; Deny wins a tie. Without rules all users have access. With rules, users require a matching Allow.</p>
+    <div class="overflow-auto">
+      <table class="table-striped">
+        <thead>
           <tr>
-            <td>
-              <a class="c-info" href="/admin/groups/{{.GroupID}}">Group {{.GroupID}}</a>
-            </td>
-            <td>{{.Priority}}</td>
-            <td>{{.AccessControl}}</td>
-            <td>
-              <form method="post" action="/admin/clients/{{$.Data.Target.ID}}/rules/{{.GroupID}}/remove">
-                {{template "csrf" $}}
-                <button class="btn btn-secondary">Remove rule</button>
-              </form>
-            </td>
+            <th>Group</th>
+            <th>Priority</th>
+            <th>Decision</th>
+            <th>Action</th>
           </tr>
-        {{else}}
-          <tr>
-            <td colspan="4">No group rules configured.</td>
-          </tr>
-        {{end}}
-      </tbody>
-    </table>
-  </div>
-  <form method="post" action="/admin/clients/{{.Data.Target.ID}}/rules">
-    {{template "csrf" $}}
-    <label>
-      Group
-      <select name="group_id" required>
-        {{range .Data.Groups}}
-          <option value="{{.ID}}">{{.Name}}</option>
-        {{end}}
-      </select>
-    </label>
-    <label>
-      Priority
-      <input name="priority" type="number" min="-32768" max="32767" value="0" required>
-    </label>
-    <label>
-      Decision
-      <select name="access_control">
-        <option value="allow">Allow</option>
-        <option value="deny">Deny</option>
-      </select>
-    </label>
-    <button class="btn btn-info">Add or replace rule</button>
-  </form>
+        </thead>
+        <tbody>
+          {{range .Data.Rules}}
+            <tr>
+              <td>
+                <a class="c-info" href="/admin/groups/{{.GroupID}}">Group {{.GroupID}}</a>
+              </td>
+              <td>{{.Priority}}</td>
+              <td>{{.AccessControl}}</td>
+              <td>
+                <form method="post" action="/admin/clients/{{$.Data.Target.ID}}/rules/{{.GroupID}}/remove">
+                  {{template "csrf" $}}
+                  <button class="btn btn-secondary">Remove rule</button>
+                </form>
+              </td>
+            </tr>
+          {{else}}
+            <tr>
+              <td colspan="4">No group rules configured.</td>
+            </tr>
+          {{end}}
+        </tbody>
+      </table>
+    </div>
+    <form method="post" action="/admin/clients/{{.Data.Target.ID}}/rules">
+      {{template "csrf" $}}
+      <label>
+        Group
+        <select name="group_id" required>
+          {{range .Data.Groups}}
+            <option value="{{.ID}}">{{.Name}}</option>
+          {{end}}
+        </select>
+      </label>
+      <label>
+        Priority
+        <input name="priority" type="number" min="-32768" max="32767" value="0" required>
+      </label>
+      <label>
+        Decision
+        <select name="access_control">
+          <option value="allow">Allow</option>
+          <option value="deny">Deny</option>
+        </select>
+      </label>
+      <button class="btn btn-info">Add or replace rule</button>
+    </form>
+  </details>
   <p>
     <a class="btn btn-error btn-outline" href="/admin/clients/{{.Data.Target.ID}}/delete">Delete client</a>
   </p>
