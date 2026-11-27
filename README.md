@@ -361,9 +361,8 @@ started when endpoint settings change.
 
 For a saved OIDC client, open **Administration > Clients > Configure SCIM
 provisioning**. Enter the target service's SCIM 2.0 base URL and bearer secret,
-then enable provisioning. For Cloudflare, copy its SCIM Endpoint and Secret from
-that identity provider's settings. Keep the Cloudflare OIDC `groups` claim and
-Guard's `groups` scope configured for group-based Access policies.
+then enable provisioning. Copy the endpoint and secret from the target service's
+provisioning settings.
 
 Guard provisions active users permitted by that client's group access rules.
 Without rules, this includes all active users with an email address. Users without
@@ -404,10 +403,5 @@ with `MFA_ENCRYPTION_KEY`, bound to their client, and never shown again. Include
 that key in secure backups. Renaming users or rotating credentials preserves
 remote mappings.
 
-Cloudflare Zero Trust requires a user's first Access login or One Client device
-registration before provisioning can begin. Its Access policies evaluate OIDC
-claims at authentication; enable Cloudflare's deprovisioning and group-change
-reauthentication options for session revocation. Gateway can apply synchronized
-User Registry identities without another login. Cloudflare dashboard SSO
-provisioning is a separate integration. Live compatibility must be verified
-against your configured service; automated tests use a local SCIM service.
+Live compatibility must be verified against your configured service; automated
+tests use a local SCIM service.

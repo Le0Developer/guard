@@ -245,3 +245,41 @@ func TestSCIMProtocolAcceptsEmptyStandardList(t *testing.T) {
 		t.Fatalf("empty list %q %v", id, err)
 	}
 }
+
+func TestSCIMProtocolToleratesPaginationHints(t *testing.T) {
+	for _, tc := range []struct{ name, body, want string }{
+		{"empty with page capacity", `{"totalResults":0,"startIndex":0,"itemsPerPage":100,"Resources":[]}`, ""},
+		{"single result with page capacity", `{"totalResults":1,"startIndex":0,"itemsPerPage":100,"Resources":[{"id":"one","externalId":"stable"}]}`, "one"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { fmt.Fprint(w, tc.body) }))
+			defer s.Close()
+			remote := scimRemote{base: s.URL, http: s.Client()}
+			id, err := remote.lookup(context.Background(), "Users", "stable")
+			if err != nil || id != tc.want {
+				t.Fatalf("lookup %q error %v", id, err)
+			}
+		})
+	}
+}
+func TestSCIMProtocolListErrorExplainsMetadataWithoutIdentityData(t *testing.T) {
+	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprint(w, `{"startIndex":1,"itemsPerPage":100,"Resources":[{"id":"private-id","userName":"private@example.org"}]}`)
+	}))
+	defer s.Close()
+	remote := scimRemote{base: s.URL, secret: "private-token", http: s.Client()}
+	_, err := remote.lookup(context.Background(), "Users", "private-external-id")
+	if err == nil {
+		t.Fatal("missing totalResults accepted")
+	}
+	for _, want := range []string{"Users", "missing totalResults", "startIndex=1", "itemsPerPage=100", "returned=1"} {
+		if !strings.Contains(err.Error(), want) {
+			t.Errorf("error lacks %q: %v", want, err)
+		}
+	}
+	for _, secret := range []string{"private-id", "private@example.org", "private-token", "private-external-id"} {
+		if strings.Contains(err.Error(), secret) {
+			t.Fatal("diagnostic exposed identity or credential")
+		}
+	}
+}

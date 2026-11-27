@@ -186,8 +186,40 @@ func (s *scimRemote) lookup(ctx context.Context, kind, externalID string) (strin
 		if err := s.request(ctx, "GET", kind, q, nil, &list); err != nil {
 			return "", err
 		}
-		if list.Total == nil || *list.Total < 0 || *list.Total > 100000 || len(list.Resources) > *list.Total || (len(list.Resources) > 0 && start-1+len(list.Resources) > *list.Total) || (list.Start != nil && *list.Start != start) || (list.Count != nil && *list.Count != len(list.Resources)) {
-			return "", scimProblem("invalid or excessive result count")
+		// Expose only numeric metadata, never response bodies or resource IDs.
+		number := func(n *int) string {
+			if n == nil {
+				return "missing"
+			}
+			return strconv.Itoa(*n)
+		}
+		invalid := func(reason string) error {
+			return scimProblem(fmt.Sprintf("%s lookup: %s (requestedStart=%d, totalResults=%s, startIndex=%s, itemsPerPage=%s, returned=%d)", kind, reason, start, number(list.Total), number(list.Start), number(list.Count), len(list.Resources)))
+		}
+		if list.Total == nil {
+			return "", invalid("missing totalResults")
+		}
+		if *list.Total < 0 || *list.Total > 100000 {
+			return "", invalid("totalResults outside supported range 0–100000")
+		}
+		if len(list.Resources) > *list.Total || (len(list.Resources) > 0 && start-1+len(list.Resources) > *list.Total) {
+			return "", invalid("returned resources exceed totalResults")
+		}
+		// Empty results are authoritative only with an explicit total of zero.
+		// Pagination defaults on an empty page have no bearing on that result.
+		if *list.Total == 0 {
+			return found, nil
+		}
+		if len(list.Resources) == 0 {
+			return "", invalid("pagination made no progress")
+		}
+		// Some providers report a zero-based first page and page capacity in
+		// itemsPerPage. Advance by actual resources, not that advisory count.
+		if list.Start != nil && *list.Start != start && !(start == 1 && *list.Start == 0) {
+			return "", invalid("unexpected startIndex")
+		}
+		if list.Count != nil && *list.Count < 0 {
+			return "", invalid("negative itemsPerPage")
 		}
 		for _, r := range list.Resources {
 			if r["externalId"] == externalID {
