@@ -140,6 +140,13 @@ func (a *App) middleware(next http.Handler) http.Handler {
 }
 func (a *App) Handler() http.Handler {
 	mux := http.NewServeMux()
+	mux.HandleFunc("GET /branding/icon", func(w http.ResponseWriter, r *http.Request) {
+		if a.Config.BrandIconFile == "" {
+			http.NotFound(w, r)
+			return
+		}
+		http.ServeFile(w, r, a.Config.BrandIconFile)
+	})
 	mux.HandleFunc("GET /{$}", a.home)
 	mux.HandleFunc("GET /login", a.login)
 	mux.HandleFunc("POST /login", a.passwordLogin)

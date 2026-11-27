@@ -74,6 +74,8 @@ and the MFA encryption key continue to work through this repository layout chang
 | `FORWARDAUTH_LISTEN_ADDR` | `127.0.0.1:4445` |
 | `MFA_ENCRYPTION_KEY` | 32 random bytes encoded as unpadded base64url; required for TOTP |
 | `PASSWORD_DISABLED` | `false` |
+| `BRAND_NAME` | `Guard`; header, page titles, security key display name, and new authenticator enrollments |
+| `BRAND_ICON_FILE` | Optional local PNG, JPEG, GIF, SVG, ICO, or WebP file; header icon and favicon |
 | `AUDIT_TRUSTED_PROXIES` | Comma-separated IP addresses/CIDRs; none trusted by default |
 | `ACCESS_LOG_EXPORT_URL` | Optional HTTPS collector endpoint |
 | `ACCESS_LOG_EXPORT_TOKEN` | Optional collector bearer credential |
@@ -82,6 +84,27 @@ and the MFA encryption key continue to work through this repository layout chang
 Sessions last 18 hours. Password login permits five attempts per IP, then one
 additional attempt per minute. Passwords use salted PBKDF2-HMAC-SHA256 with
 600,000 iterations. There is no bcrypt import or `PASSWORD_BCRYPT_COST` setting.
+
+To use custom branding, set these values in `guard.env`:
+
+```dotenv
+BRAND_NAME=Company Login
+BRAND_ICON_FILE=/branding/icon.svg
+```
+
+Mount the icon into the `guard` service in `compose.yaml`:
+
+```yaml
+services:
+  guard:
+    volumes:
+      - ./branding/icon.svg:/branding/icon.svg:ro
+```
+
+The container runs as UID/GID 65532; make the icon readable by that user.
+Restart Guard after changing branding settings. The configured file must exist
+and be readable at startup. Guard serves it publicly at `/branding/icon`.
+Existing authenticator entries retain the name they were enrolled with.
 
 ## Upstream login
 

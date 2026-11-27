@@ -8,6 +8,7 @@ import (
 	"net/netip"
 	"net/url"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 )
@@ -15,6 +16,27 @@ import (
 func LoadConfig() (Config, error) { return configFromEnv(os.Getenv) }
 func configFromEnv(get func(string) string) (Config, error) {
 	c := Config{Domain: strings.TrimRight(get("DOMAIN"), "/"), DatabaseURL: get("DATABASE_URL"), ListenAddr: get("LISTEN_ADDR"), ForwardAuthListenAddr: get("FORWARDAUTH_LISTEN_ADDR"), MFAEncryptionKey: get("MFA_ENCRYPTION_KEY"), ExportURL: get("ACCESS_LOG_EXPORT_URL"), ExportToken: get("ACCESS_LOG_EXPORT_TOKEN"), ReportLimit: 600}
+	c.BrandName = strings.TrimSpace(get("BRAND_NAME"))
+	c.BrandIconFile = get("BRAND_ICON_FILE")
+	if c.BrandIconFile != "" {
+		switch strings.ToLower(filepath.Ext(c.BrandIconFile)) {
+		case ".png", ".jpg", ".jpeg", ".gif", ".svg", ".ico", ".webp":
+		default:
+			return c, errors.New("BRAND_ICON_FILE must be a PNG, JPEG, GIF, SVG, ICO, or WebP file")
+		}
+		f, err := os.Open(c.BrandIconFile)
+		if err != nil {
+			return c, fmt.Errorf("BRAND_ICON_FILE: %w", err)
+		}
+		info, err := f.Stat()
+		f.Close()
+		if err != nil {
+			return c, fmt.Errorf("BRAND_ICON_FILE: %w", err)
+		}
+		if !info.Mode().IsRegular() {
+			return c, errors.New("BRAND_ICON_FILE must be a regular file")
+		}
+	}
 	origin, err := security.Origin(c.Domain)
 	if err != nil {
 		return c, fmt.Errorf("DOMAIN: %w", err)
@@ -75,4 +97,11 @@ func configFromEnv(get func(string) string) (Config, error) {
 		c.TrustedProxies = append(c.TrustedProxies, s)
 	}
 	return c, nil
+}
+
+func (c Config) brandName() string {
+	if strings.TrimSpace(c.BrandName) == "" {
+		return "Guard"
+	}
+	return c.BrandName
 }

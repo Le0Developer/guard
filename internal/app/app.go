@@ -22,6 +22,7 @@ var assets embed.FS
 const SessionLifetime = 18 * time.Hour
 
 type Config struct {
+	BrandName, BrandIconFile                                                 string
 	Domain, DatabaseURL, ListenAddr, ForwardAuthListenAddr, MFAEncryptionKey string
 	PasswordDisabled                                                         bool
 	TrustedProxies                                                           []string
@@ -101,7 +102,7 @@ func (a *App) page(w http.ResponseWriter, r *http.Request, title, body string, d
 	if v, ok := a.user(r); ok {
 		current = &v.User
 	}
-	view := map[string]any{"Title": title, "CSRF": csrf(r), "User": current, "Data": data, "AdminSection": adminSection(r.URL.Path)}
+	view := map[string]any{"BrandName": a.Config.brandName(), "BrandIcon": a.Config.BrandIconFile != "", "Title": title, "CSRF": csrf(r), "User": current, "Data": data, "AdminSection": adminSection(r.URL.Path)}
 	// Render before committing headers so template failures cannot emit a partial page.
 	var b byteBuffer
 	if err = t.Execute(&b, view); err != nil {
@@ -118,8 +119,8 @@ type byteBuffer []byte
 func (b *byteBuffer) Write(p []byte) (int, error) { *b = append(*b, p...); return len(p), nil }
 
 const layout = `<!doctype html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light dark"><title>{{.Title}} · Guard</title><link rel="stylesheet" href="/static/styles.css"><script src="/static/security.js" defer></script><script src="/static/provider-setup.js" defer></script></head>
-<body><header class="container"><nav aria-label="Main navigation"><ul><li><a class="c-info" href="/"><strong>Guard</strong></a></li></ul>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light dark"><title>{{.Title}} · {{.BrandName}}</title>{{if .BrandIcon}}<link rel="icon" href="/branding/icon">{{end}}<link rel="stylesheet" href="/static/styles.css"><script src="/static/security.js" defer></script><script src="/static/provider-setup.js" defer></script></head>
+<body><header class="container"><nav aria-label="Main navigation"><ul><li><a class="c-info" href="/">{{if .BrandIcon}}<img class="brand-icon" src="/branding/icon" width="32" height="32" alt=""> {{end}}<strong>{{.BrandName}}</strong></a></li></ul>
 {{if .User}}<ul class="d-none d-md-flex"><li><a class="c-info" href="/">My account</a></li>{{if eq .User.Role "Admin"}}<li><a class="c-info" href="/admin">Administration</a></li>{{end}}<li>{{template "logout" .}}</li></ul>
 <ul class="d-md-none"><li><details class="dropdown"><summary role="button" class="btn btn-info btn-outline">Account</summary><ul dir="rtl"><li dir="ltr"><a class="c-info" href="/">My account</a></li>{{if eq .User.Role "Admin"}}<li dir="ltr"><a class="c-info" href="/admin">Administration</a></li>{{end}}<li dir="ltr">{{template "logout" .}}</li></ul></details></li></ul>{{end}}</nav>{{if .User}}<hr>{{end}}</header>
 <main class="container" id="main-content">{{if .User}}{{if .AdminSection}}{{template "admin-nav" .}}{{end}}{{if eq .Title "My account"}}<h1>Welcome, {{.User.Username}}</h1>{{else}}<h1>{{.Title}}</h1>{{end}}{{template "content" .}}{{else}}<div class="row"><section class="col-12 col-md-8 offset-md-2 col-lg-6 offset-lg-3"><article><header><h1>{{.Title}}</h1></header>{{template "content" .}}</article></section></div>{{end}}</main>

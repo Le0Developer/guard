@@ -31,7 +31,7 @@ func (a *App) mfaWeb() (*webauthn.WebAuthn, error) {
 	if u.Hostname() == "" || (u.Scheme != "https" && (u.Scheme != "http" || u.Hostname() != "localhost")) {
 		return nil, errors.New("Security keys require HTTPS or http://localhost.")
 	}
-	return webauthn.New(&webauthn.Config{RPID: u.Hostname(), RPDisplayName: "Guard", RPOrigins: []string{u.Scheme + "://" + u.Host}})
+	return webauthn.New(&webauthn.Config{RPID: u.Hostname(), RPDisplayName: a.Config.brandName(), RPOrigins: []string{u.Scheme + "://" + u.Host}})
 }
 func mfaWebLoad(ctx context.Context, q *db.Queries, u db.User) (mfaWebUser, error) {
 	v := mfaWebUser{User: u}

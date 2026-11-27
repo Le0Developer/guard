@@ -4,3 +4,5 @@
 .admin-nav{flex-wrap:wrap;justify-content:flex-start}.admin-nav a{white-space:nowrap}
 /* App launcher uses the same buttons as the rest of Guard. */
 .app-launcher{display:flex;flex-wrap:wrap;gap:1rem;list-style:none;padding:0}.app-launcher li{list-style:none;margin:0;max-width:100%}.app-launcher .btn{max-width:100%;overflow-wrap:anywhere}.app-launcher [aria-disabled=true]{opacity:.65}
+
+.brand-icon{object-fit:contain;vertical-align:middle}

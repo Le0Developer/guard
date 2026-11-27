@@ -59,7 +59,7 @@ func (a *App) mfaManage(w http.ResponseWriter, r *http.Request) {
 			if e != nil {
 				return e
 			}
-			uri := "otpauth://totp/" + url.PathEscape("Guard:"+strings.ReplaceAll(c.Target.Username, ":", "_")) + "?secret=" + secret + "&issuer=Guard&algorithm=SHA1&digits=6&period=30"
+			uri := "otpauth://totp/" + url.PathEscape(strings.ReplaceAll(a.Config.brandName(), ":", "_")+":"+strings.ReplaceAll(c.Target.Username, ":", "_")) + "?secret=" + secret + "&issuer=" + url.QueryEscape(strings.ReplaceAll(a.Config.brandName(), ":", "_")) + "&algorithm=SHA1&digits=6&period=30"
 			setup = map[string]any{"Base": c.Base, "Secret": secret, "URI": template.URL(uri), "Ticket": ticket}
 			return nil
 		case strings.HasSuffix(path, "/totp/confirm"):
