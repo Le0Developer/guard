@@ -1,11 +1,10 @@
-# Only send files required to compile Guard to the builder.
+# Only module metadata, source, embedded assets and migrations belong in the build.
 **
-!Cargo.toml
-!Cargo.lock
-!Toasty.toml
-!src/
-!src/**
-!views/
-!views/**
-!toasty/
-!toasty/**
+!go.mod
+!go.sum
+!cmd/
+!cmd/**
+!internal/
+!internal/**
+**/*_test.go
+**/.DS_Store

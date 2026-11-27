@@ -2,8 +2,6 @@ name: Container image
 
 on:
   push:
-    branches: [master, main]
-    tags: ["v*"]
   pull_request:
   workflow_dispatch:
 
@@ -15,9 +13,70 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
-  image:
+  checks:
+    name: Go ${{ matrix.go }}
     runs-on: ubuntu-latest
-    timeout-minutes: 90
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        go: ['1.26.x', '1.27.x']
+    services:
+      postgres:
+        image: postgres:18-alpine
+        env:
+          POSTGRES_USER: guard
+          POSTGRES_HOST_AUTH_METHOD: trust
+          POSTGRES_DB: guard
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U guard -d guard"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      GUARD_TEST_DATABASE_URL: postgres://guard@localhost:5432/guard?sslmode=disable
+      GOFLAGS: -mod=readonly
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version: ${{ matrix.go }}
+          cache-dependency-path: go.sum
+      - name: Set up sqlc
+        uses: sqlc-dev/setup-sqlc@v5
+        with:
+          sqlc-version: '1.31.1'
+      - name: Check formatting
+        run: test -z "$(gofmt -l cmd internal)"
+      - name: Verify generated queries
+        run: |
+          sqlc generate
+          git diff --exit-code -- internal/db
+          test -z "$(git ls-files --others --exclude-standard -- internal/db)"
+          sqlc vet
+      - name: Vet
+        run: go vet ./...
+      - name: Test against PostgreSQL
+        run: go test -race ./...
+      - name: Build
+        run: go build ./cmd/guard
+      - name: Validate Compose
+        run: |
+          cp guard.env.example guard.env
+          docker compose config --quiet
+
+  image:
+    needs: checks
+    if: >-
+      github.event_name == 'pull_request' ||
+      github.event_name == 'workflow_dispatch' ||
+      github.ref == 'refs/heads/master' || github.ref == 'refs/heads/main' ||
+      startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
     permissions:
       contents: read
       packages: write
@@ -26,21 +85,13 @@ jobs:
         uses: actions/checkout@v6
         with:
           persist-credentials: false
-
       - name: Set image name
         id: image
         env:
           REPOSITORY: ${{ github.repository }}
         run: echo "name=ghcr.io/${REPOSITORY,,}" >> "$GITHUB_OUTPUT"
-
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v4
-        with:
-          platforms: arm64
-
       - name: Set up Buildx
         uses: docker/setup-buildx-action@v4
-
       - name: Log in to GHCR
         if: github.event_name != 'pull_request'
         uses: docker/login-action@v4
@@ -48,7 +99,6 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-
       - name: Set image tags
         id: meta
         uses: docker/metadata-action@v6
@@ -61,7 +111,6 @@ jobs:
             type=ref,event=pr
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
-
       - name: Build and publish
         uses: docker/build-push-action@v7
         with:
@@ -70,5 +119,5 @@ jobs:
           push: ${{ github.event_name != 'pull_request' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha,scope=guard-image
-          cache-to: type=gha,scope=guard-image,mode=max,ignore-error=true
+          cache-from: type=gha,scope=guard-go-image
+          cache-to: type=gha,scope=guard-go-image,mode=max,ignore-error=true

@@ -1,0 +1,499 @@
+{
+  "version": "2",
+  "sql": [
+    {
+      "engine": "postgresql",
+      "schema": "internal/db/migrations",
+      "queries": "sql/queries",
+      "gen": {
+        "go": {
+          "package": "db",
+          "out": "internal/db",
+          "sql_package": "pgx/v5",
+          "emit_json_tags": true,
+          "emit_pointers_for_null_types": true,
+          "emit_empty_slices": true,
+          "overrides": [
+            {
+              "column": "users.id",
+              "go_type": {
+                "import": "github.com/le0developer/guard/internal/ids",
+                "type": "UserID"
+              }
+            },
+            {
+              "column": "sessions.id",
+              "go_type": {
+                "import": "github.com/le0developer/guard/internal/ids",
+                "type": "SessionID"
+              }
+            },
+            {
+              "column": "sessions.user_id",
+              "go_type": {
+                "import": "github.com/le0developer/guard/internal/ids",
+                "type": "UserID"
+              }
+            },
+            {
+              "column": "login_sessions.id",
+              "go_type": {
+                "import": "github.com/le0developer/guard/internal/ids",
+                "type": "LoginSessionID"
+              }
+            },
+            {
+              "column": "groups.id",
+              "go_type": {
+                "import": "github.com/le0developer/guard/internal/ids",
+                "type": "GroupID"
+              }
+            },
+            {
+              "column": "group_members.group_id",
+              "go_type": {
+                "import": "github.com/le0developer/guard/internal/ids",
+                "type": "GroupID"
+              }
+            },
+            {
+              "column": "group_members.user_id",
+              "go_type": {
+                "import": "github.com/le0developer/guard/internal/ids",
+                "type": "UserID"
+              }
+            },
+            {
+              "column": "clients.id",
+              "go_type": {
+                "import": "github.com/le0developer/guard/internal/ids",
+                "type": "ClientID"
+              }
+            },
+            {
+              "column": "client_redirects.id",
+              "go_type": {
+                "import": "github.com/le0developer/guard/internal/ids",
+                "type": "ClientRedirectID"
+              }
+            },
+            {
+              "column": "client_redirects.client_id",
+              "go_type": {
+                "import": "github.com/le0developer/guard/internal/ids",
+                "type": "ClientID"
+              }
+            },
+            {
+              "column": "client_access_rules.client_id",
+              "go_type": {
+                "import": "github.com/le0developer/guard/internal/ids",
+                "type": "ClientID"
+              }
+            },
+            {
+              "column": "client_access_rules.group_id",
+              "go_type": {
+                "import": "github.com/le0developer/guard/internal/ids",
+                "type": "GroupID"
+              }
+            },
+            {
+              "column": "authorization_codes.id",
+              "go_type": {
+                "import": "github.com/le0developer/guard/internal/ids",
+                "type": "AuthorizationCodeID"
+              }
+            },
+            {
+              "column": "authorization_codes.client_id",
+              "go_type": {
+                "import": "github.com/le0developer/guard/internal/ids",
+                "type": "ClientID"
+              }
+            },
+            {
+              "column": "authorization_codes.user_id",
+              "go_type": {
+                "import": "github.com/le0developer/guard/internal/ids",
+                "type": "UserID"
+              }
+            },
+            {
+              "column": "authorization_codes.session_id",
+              "go_type": {
+                "import": "github.com/le0developer/guard/internal/ids",
+                "type": "SessionID"
+              }
+            },
+            {
+              "column": "oauth_tokens.id",
+              "go_type": {
+                "import": "github.com/le0developer/guard/internal/ids",
+                "type": "OAuthTokenID"
+              }
+            },
+            {
+              "column": "oauth_tokens.client_id",
+              "go_type": {
+                "import": "github.com/le0developer/guard/internal/ids",
+                "type": "ClientID"
+              }
+            },
+            {
+              "column": "oauth_tokens.user_id",
+              "go_type": {
+                "import": "github.com/le0developer/guard/internal/ids",
+                "type": "UserID"
+              }
+            },
+            {
+              "column": "oauth_tokens.session_id",
+              "go_type": {
+                "import": "github.com/le0developer/guard/internal/ids",
+                "type": "SessionID"
+              }
+            },
+            {
+              "column": "oauth_tokens.code_id",
+              "go_type": {
+                "import": "github.com/le0developer/guard/internal/ids",
+                "type": "AuthorizationCodeID"
+              }
+            },
+            {
+              "column": "signing_keys.id",
+              "go_type": {
+                "import": "github.com/le0developer/guard/internal/ids",
+                "type": "SigningKeyID"
+              }
+            },
+            {
+              "column": "signing_keys.client_id",
+              "go_type": {
+                "import": "github.com/le0developer/guard/internal/ids",
+                "type": "ClientID"
+              }
+            },
+            {
+              "column": "totp_authenticators.id",
+              "go_type": {
+                "import": "github.com/le0developer/guard/internal/ids",
+                "type": "TotpAuthenticatorID"
+              }
+            },
+            {
+              "column": "totp_authenticators.user_id",
+              "go_type": {
+                "import": "github.com/le0developer/guard/internal/ids",
+                "type": "UserID"
+              }
+            },
+            {
+              "column": "webauthn_credentials.id",
+              "go_type": {
+                "import": "github.com/le0developer/guard/internal/ids",
+                "type": "WebauthnCredentialID"
+              }
+            },
+            {
+              "column": "webauthn_credentials.user_id",
+              "go_type": {
+                "import": "github.com/le0developer/guard/internal/ids",
+                "type": "UserID"
+              }
+            },
+            {
+              "column": "recovery_codes.id",
+              "go_type": {
+                "import": "github.com/le0developer/guard/internal/ids",
+                "type": "RecoveryCodeID"
+              }
+            },
+            {
+              "column": "recovery_codes.user_id",
+              "go_type": {
+                "import": "github.com/le0developer/guard/internal/ids",
+                "type": "UserID"
+              }
+            },
+            {
+              "column": "mfa_ceremonies.id",
+              "go_type": {
+                "import": "github.com/le0developer/guard/internal/ids",
+                "type": "MfaCeremonyID"
+              }
+            },
+            {
+              "column": "mfa_ceremonies.user_id",
+              "go_type": {
+                "import": "github.com/le0developer/guard/internal/ids",
+                "type": "UserID"
+              }
+            },
+            {
+              "column": "mfa_ceremonies.actor_id",
+              "go_type": {
+                "import": "github.com/le0developer/guard/internal/ids",
+                "type": "UserID"
+              }
+            },
+            {
+              "column": "mfa_ceremonies.session_id",
+              "go_type": {
+                "import": "github.com/le0developer/guard/internal/ids",
+                "type": "SessionID",
+                "pointer": true
+              }
+            },
+            {
+              "column": "mfa_ceremonies.login_session_id",
+              "go_type": {
+                "import": "github.com/le0developer/guard/internal/ids",
+                "type": "LoginSessionID",
+                "pointer": true
+              }
+            },
+            {
+              "column": "forward_auth_requests.id",
+              "go_type": {
+                "import": "github.com/le0developer/guard/internal/ids",
+                "type": "ForwardAuthRequestID"
+              }
+            },
+            {
+              "column": "forward_auth_requests.client_id",
+              "go_type": {
+                "import": "github.com/le0developer/guard/internal/ids",
+                "type": "ClientID"
+              }
+            },
+            {
+              "column": "forward_auth_requests.user_id",
+              "go_type": {
+                "import": "github.com/le0developer/guard/internal/ids",
+                "type": "UserID",
+                "pointer": true
+              }
+            },
+            {
+              "column": "forward_auth_requests.session_id",
+              "go_type": {
+                "import": "github.com/le0developer/guard/internal/ids",
+                "type": "SessionID",
+                "pointer": true
+              }
+            },
+            {
+              "column": "forward_auth_sessions.id",
+              "go_type": {
+                "import": "github.com/le0developer/guard/internal/ids",
+                "type": "ForwardAuthSessionID"
+              }
+            },
+            {
+              "column": "forward_auth_sessions.client_id",
+              "go_type": {
+                "import": "github.com/le0developer/guard/internal/ids",
+                "type": "ClientID"
+              }
+            },
+            {
+              "column": "forward_auth_sessions.user_id",
+              "go_type": {
+                "import": "github.com/le0developer/guard/internal/ids",
+                "type": "UserID"
+              }
+            },
+            {
+              "column": "forward_auth_sessions.session_id",
+              "go_type": {
+                "import": "github.com/le0developer/guard/internal/ids",
+                "type": "SessionID"
+              }
+            },
+            {
+              "column": "audit_logs.id",
+              "go_type": {
+                "import": "github.com/le0developer/guard/internal/ids",
+                "type": "AuditLogID"
+              }
+            },
+            {
+              "column": "audit_logs.user_id",
+              "go_type": {
+                "import": "github.com/le0developer/guard/internal/ids",
+                "type": "UserID"
+              }
+            },
+            {
+              "column": "access_logs.id",
+              "go_type": {
+                "import": "github.com/le0developer/guard/internal/ids",
+                "type": "AccessLogID"
+              }
+            },
+            {
+              "column": "access_logs.client_id",
+              "go_type": {
+                "import": "github.com/le0developer/guard/internal/ids",
+                "type": "ClientID"
+              }
+            },
+            {
+              "column": "access_logs.user_id",
+              "go_type": {
+                "import": "github.com/le0developer/guard/internal/ids",
+                "type": "UserID",
+                "pointer": true
+              }
+            },
+            {
+              "column": "access_logs.session_id",
+              "go_type": {
+                "import": "github.com/le0developer/guard/internal/ids",
+                "type": "SessionID",
+                "pointer": true
+              }
+            },
+            {
+              "column": "access_log_deliveries.log_id",
+              "go_type": {
+                "import": "github.com/le0developer/guard/internal/ids",
+                "type": "AccessLogID"
+              }
+            },
+            {
+              "column": "event_report_rates.client_id",
+              "go_type": {
+                "import": "github.com/le0developer/guard/internal/ids",
+                "type": "ClientID"
+              }
+            },
+            {
+              "db_type": "timestamptz",
+              "go_type": {
+                "import": "time",
+                "type": "Time"
+              }
+            },
+            {
+              "db_type": "timestamptz",
+              "nullable": true,
+              "go_type": {
+                "import": "time",
+                "type": "Time",
+                "pointer": true
+              }
+            },
+            {
+              "column": "oidc_sessions.id",
+              "go_type": {
+                "import": "github.com/le0developer/guard/internal/ids",
+                "type": "OIDCSessionID"
+              }
+            },
+            {
+              "column": "oidc_sessions.client_id",
+              "go_type": {
+                "import": "github.com/le0developer/guard/internal/ids",
+                "type": "ClientID"
+              }
+            },
+            {
+              "column": "oidc_sessions.session_id",
+              "go_type": {
+                "import": "github.com/le0developer/guard/internal/ids",
+                "type": "SessionID"
+              }
+            },
+            {
+              "column": "oidc_sessions.user_id",
+              "go_type": {
+                "import": "github.com/le0developer/guard/internal/ids",
+                "type": "UserID"
+              }
+            },
+            {
+              "column": "logout_deliveries.id",
+              "go_type": {
+                "import": "github.com/le0developer/guard/internal/ids",
+                "type": "LogoutDeliveryID"
+              }
+            },
+            {
+              "column": "logout_deliveries.client_id",
+              "go_type": {
+                "import": "github.com/le0developer/guard/internal/ids",
+                "type": "ClientID"
+              }
+            },
+            {
+              "column": "logout_deliveries.session_id",
+              "go_type": {
+                "import": "github.com/le0developer/guard/internal/ids",
+                "type": "SessionID"
+              }
+            },
+            {
+              "column": "logout_deliveries.user_id",
+              "go_type": {
+                "import": "github.com/le0developer/guard/internal/ids",
+                "type": "UserID"
+              }
+            },
+            {
+              "column": "upstream_providers.id",
+              "go_type": {
+                "import": "github.com/le0developer/guard/internal/ids",
+                "type": "UpstreamProviderID"
+              }
+            },
+            {
+              "column": "upstream_pending_logins.login_session_id",
+              "go_type": {
+                "import": "github.com/le0developer/guard/internal/ids",
+                "type": "LoginSessionID"
+              }
+            },
+            {
+              "column": "upstream_pending_logins.provider_id",
+              "go_type": {
+                "import": "github.com/le0developer/guard/internal/ids",
+                "type": "UpstreamProviderID"
+              }
+            },
+            {
+              "column": "upstream_sessions.session_id",
+              "go_type": {
+                "import": "github.com/le0developer/guard/internal/ids",
+                "type": "SessionID"
+              }
+            },
+            {
+              "column": "upstream_sessions.provider_id",
+              "go_type": {
+                "import": "github.com/le0developer/guard/internal/ids",
+                "type": "UpstreamProviderID"
+              }
+            },
+            {
+              "column": "upstream_logout_events.provider_id",
+              "go_type": {
+                "import": "github.com/le0developer/guard/internal/ids",
+                "type": "UpstreamProviderID"
+              }
+            },
+            {
+              "column": "upstream_pending_logins.user_id",
+              "go_type": {
+                "import": "github.com/le0developer/guard/internal/ids",
+                "type": "UserID"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ]
+}

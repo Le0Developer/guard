@@ -1,20 +1,42 @@
 name: guard
-
 services:
   guard:
-    image: ${GUARD_IMAGE:?Set GUARD_IMAGE to your Guard image}
+    image: ${GUARD_IMAGE:-ghcr.io/le0developer/guard:latest}
+    build: .
     restart: unless-stopped
-    env_file:
-      - guard.env
+    env_file: guard.env
+    environment:
+      DATABASE_URL: postgres://guard@db/guard?sslmode=disable
+      FORWARDAUTH_LISTEN_ADDR: 0.0.0.0:4445
     ports:
       - "127.0.0.1:4444:4444"
       - "127.0.0.1:4445:4445"
+    networks: [default, database]
+    depends_on:
+      db:
+        condition: service_healthy
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+  db:
+    image: postgres:18-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: guard
+      POSTGRES_DB: guard
+      POSTGRES_HOST_AUTH_METHOD: trust
+    command: [postgres, -c, hba_file=/etc/postgresql/pg_hba.conf]
+    networks: [database]
     volumes:
-      - guard-data:/data
-    cap_drop:
-      - ALL
-    security_opt:
-      - no-new-privileges:true
-
+      - guard-postgres:/var/lib/postgresql
+      - ./postgres/pg_hba.conf:/etc/postgresql/pg_hba.conf:ro
+    healthcheck:
+      test: [CMD-SHELL, "pg_isready -U guard -d guard"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
 volumes:
-  guard-data:
+  guard-postgres:
+
+networks:
+  database:
+    internal: true

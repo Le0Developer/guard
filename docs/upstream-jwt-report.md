@@ -1,0 +1,15 @@
+# Upstream JWT verification
+
+Implemented with Go standard library only. Supported pinned algorithms: RS256, RS384, RS512, PS256, PS384, PS512, ES256, ES384, ES512, EdDSA (Ed25519 only).
+
+Verifies exact issuer, client audience, authorized party, issued-at, required expiry, ID-token nonce and subject, and logout event/JTI/subject-or-session rules. Expired tokens are rejected immediately; future issuance has 60 seconds tolerance; logout issuance must be within five minutes. Logout nonce is prohibited even when null. JWT headers and claims reject duplicate JSON members at all nesting levels. Token-controlled key URLs, embedded keys, critical extensions, and unencoded payloads are rejected.
+
+JWKS fetches use the configured validated HTTPS URL (HTTP only for loopback development), no redirects, a five-second timeout, a one-MiB response limit, and at most 100 keys. RSA keys require 2048–8192-bit modulus and bounded odd exponent; EC keys require matching curve, fixed-width coordinates, and on-curve points; JOSE ECDSA signatures use raw R/S format. Key metadata restricts algorithm, use, and key operations. PSS salt length equals hash length.
+
+Each App has a concurrency-safe bounded cache, 24-hour TTL (updated at the user’s request), and ten-second refresh throttle. Identity includes provider ID, revision, issuer, JWKS URL, and signing algorithm. Unknown key IDs trigger refresh after the throttle interval. Fetch/format failures wrap no sensitive token details and return errUpstreamJWKSUnavailable; token failures return errUpstreamJWTInvalid. Callers distinguish them with errors.Is.
+
+Verification: isolated tests passed with the race detector (22 cases), covering signatures for every supported algorithm and altered signatures, ES256 JWT claims/header boundaries, nested duplicate members, HTTP failure, cache reuse, provider revision invalidation, and unknown-key rotation throttling. Repository-wide checks remain with the integrating agent.
+
+Follow-up hardening: supplied sub/sid/jti must be nonempty strings. Unknown key IDs during the ten-second refresh throttle return the retryable key-unavailable error, preventing an immediate legitimate rotation from becoming a permanent invalid-token response. Regression tests failed before these fixes and pass afterward; the complete focused upstream suite passes with the race detector in the integrated app package.
+
+Availability review follow-up: cache coordination now uses a per-identity completion channel. Network I/O and response parsing occur outside the map mutex. Same-identity refreshes share the in-flight result; waiting callers honor context cancellation. Fresh cached keys remain usable during a refresh, and both cached and uncached unrelated providers proceed independently. Active entries are never evicted; the 256-entry limit is preserved by evicting inactive entries or temporarily returning unavailable when every slot is active. The new regression failed before the fix on both unrelated-provider paths and cancellation, then passed along with all focused upstream tests under the race detector.

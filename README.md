@@ -1,236 +1,312 @@
 # Guard
 
-Guard provides OpenID Connect and ForwardAuth for your applications. It has
-local password login, upstream OIDC login, user and group management, TOTP,
-security keys, backup codes, and an administrator dashboard.
+Guard provides OpenID Connect and private ForwardAuth for your applications,
+with password/upstream login, MFA and an administrator dashboard.
+It runs as one Go binary backed by PostgreSQL.
 
-## Deploy with Docker Compose
+Requires Go 1.26 or later and PostgreSQL 14 or later. Direct runtime dependencies
+are pgx/v5 and go-webauthn; sqlc generates the checked-in database code. HTTP,
+templates, upstream OAuth, provider OAuth/JWT, passwords, TOTP, encryption,
+logging, migrations, and background work use the Go standard library.
+WebAuthn and pgx bring their own indirect dependencies.
 
-Run Guard behind an HTTPS reverse proxy. Use one Guard instance with a
-persistent data volume.
+## Run locally
 
-The runtime image has no shell or package manager. Use `docker compose logs
-guard` to read its output.
-
-Images publish to `ghcr.io/le0developer/guard`.
-
-```sh
-export GUARD_IMAGE=ghcr.io/le0developer/guard:latest
-```
-
-Set `GUARD_IMAGE` in each shell where you run Compose, or save it in a `.env`
-file next to `compose.yaml`.
-
-Generate a key for authenticator apps. Keep this key through upgrades and
-include it in your backups.
+From the repository root, with a PostgreSQL database you own:
 
 ```sh
-python3 -c 'import secrets; print(secrets.token_urlsafe(32))'
+export DOMAIN=http://localhost:4444
+export DATABASE_URL='postgres://guard:password@localhost:5432/guard?sslmode=disable'
+export MFA_ENCRYPTION_KEY="$(python3 -c 'import secrets; print(secrets.token_urlsafe(32))')"
+go run ./cmd/guard
 ```
 
-Create `guard.env` next to the supplied `compose.yaml`. Set your public URL and
-paste the generated key.
+Save `MFA_ENCRYPTION_KEY` securely and keep it through restarts. Startup applies
+embedded SQL migrations and prints a random password for the initial `system`
+administrator once. Treat those logs as sensitive. Create your own administrator
+and enroll MFA at `/security`.
 
-```dotenv
-DOMAIN=https://auth.example.com
-MFA_ENCRYPTION_KEY=PASTE_GENERATED_KEY_HERE
-```
+The public service listens on port 4444; the separate private ForwardAuth service
+listens on `127.0.0.1:4445` by default. Use HTTPS outside loopback development.
+No environment file is loaded by the binary; export settings or use Compose.
 
-Protect the file, then start Guard.
+## Docker Compose
 
 ```sh
-chmod 600 guard.env
+cp guard.env.example guard.env
+cp .env.example .env
+# Edit DOMAIN and MFA_ENCRYPTION_KEY in guard.env.
+# Keep or change GUARD_IMAGE to select the published image.
+chmod 600 guard.env .env
+docker compose pull
 docker compose up -d
 docker compose logs guard
 ```
 
-On the first start, Guard prints a generated password for the `system`
-administrator. Sign in at your public URL, create your administrator account,
-and enroll MFA. Treat the startup logs as sensitive because they contain that
-initial password.
+To build the current checkout instead of using a published image, run
+`docker compose up --build -d`. For a standalone image, run
+`docker build -t guard:local .`.
 
-The Compose file publishes both ports on the host's loopback address:
+Compose creates a persistent PostgreSQL volume and uses passwordless trust
+authentication on a private, internal Docker network shared only by Guard and
+PostgreSQL. The database port is not published. The supplied `postgres/pg_hba.conf`
+also applies this authentication policy to existing initialized volumes.
+Both Guard ports are published on loopback. Point an HTTPS reverse proxy at
+4444 and keep 4445 accessible only to the proxy. On a shared Docker network,
+use `guard:4444` and `guard:4445`. Configure `AUDIT_TRUSTED_PROXIES` for the
+actual proxy peers and overwrite client-supplied forwarded headers.
 
-| Host address     | Purpose                        |
-| ---------------- | ------------------------------ |
-| `127.0.0.1:4444` | Login, administration and OIDC |
-| `127.0.0.1:4445` | Private ForwardAuth service    |
+Back up PostgreSQL with `pg_dump` and keep the MFA key/configuration with the
+backup. Restoring an old binary after a schema change requires a matching
+database backup. Guard retains audit/access logs; monitor storage growth.
 
-Point your HTTPS reverse proxy at port 4444 for `auth.example.com`. Keep port
-4445 private. ForwardAuth trusts the proxy headers it receives. See the
-[Caddy, Traefik and Nginx examples](docs/forwardauth.md) for protected
-applications.
+The former Rust/SQLite data is not imported. Start with an empty PostgreSQL
+database; keep any old SQLite backup separately. Existing Go PostgreSQL data
+and the MFA encryption key continue to work through this repository layout change.
 
-If your reverse proxy runs in Docker, connect it to Guard's Compose network and
-use `guard:4444` and `guard:4445`. The loopback mappings above are for proxies
-running on the host.
+## Settings
 
-Set `AUDIT_TRUSTED_PROXIES` in `guard.env` to the IP addresses or CIDRs of the
-proxies connecting to Guard. Guard uses these addresses to decide whether to
-trust forwarded client IPs for login limits and access records. Configure the
-proxy to overwrite client-supplied forwarded headers. With Docker port mappings,
-the connecting address may be the Docker gateway rather than `127.0.0.1`.
+| Variable | Default / purpose |
+| --- | --- |
+| `DOMAIN` | Required public origin, HTTPS except loopback |
+| `DATABASE_URL` | Required PostgreSQL URL; use TLS for remote databases |
+| `LISTEN_ADDR` | `0.0.0.0:4444` |
+| `FORWARDAUTH_LISTEN_ADDR` | `127.0.0.1:4445` |
+| `MFA_ENCRYPTION_KEY` | 32 random bytes encoded as unpadded base64url; required for TOTP |
+| `PASSWORD_DISABLED` | `false` |
+| `AUDIT_TRUSTED_PROXIES` | Comma-separated IP addresses/CIDRs; none trusted by default |
+| `ACCESS_LOG_EXPORT_URL` | Optional HTTPS collector endpoint |
+| `ACCESS_LOG_EXPORT_TOKEN` | Optional collector bearer credential |
+| `AUDIT_EVENT_REPORTS_PER_MINUTE` | `600` per client |
 
-Guard stores its database in the `guard-data` volume. Keep that volume when
-replacing the container. For a bind mount, give UID 10001 write access to the
-directory.
+Sessions last 18 hours. Password login permits five attempts per IP, then one
+additional attempt per minute. Passwords use salted PBKDF2-HMAC-SHA256 with
+600,000 iterations. There is no bcrypt import or `PASSWORD_BCRYPT_COST` setting.
 
-## Configuration
+## Upstream login
 
-Pass settings through the container environment. Docker Compose loads
-`guard.env` in the supplied setup.
+Configure upstream providers under **Administration > Login providers**
+(`/admin/providers`). Upstream OIDC environment variables have been removed;
+there is no automatic import. Provider changes apply immediately without a
+restart. Password login and the initial administrator remain available according
+to `PASSWORD_DISABLED`; keep password login enabled until upstream access works.
 
-| Setting                          | Required        | Value                                                                                                                                            |
-| -------------------------------- | --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `DOMAIN`                         | **Yes**         | Public base URL, such as `https://auth.example.com`. Use HTTPS outside local development.                                                        |
-| `DATABASE_URL`                   | No              | The image defaults to `sqlite:///data/guard.sqlite3`. Keep the database on persistent storage.                                                   |
-| `LISTEN_ADDR`                    | No              | The image listens on `0.0.0.0:4444` for the public server.                                                                                       |
-| `FORWARDAUTH_LISTEN_ADDR`        | No              | The image listens on `0.0.0.0:4445` for the private ForwardAuth service. Restrict access to your proxies.                                        |
-| `MFA_ENCRYPTION_KEY`             | **Recommended** | Required for authenticator apps. Generate a 32-byte base64url key with the command above. Losing it makes existing TOTP authenticators unusable. |
-| `PASSWORD_DISABLED`              | No              | Set to `true` to disable password login after you have confirmed upstream login works. Defaults to `false`.                                      |
-| `AUDIT_TRUSTED_PROXIES`          | No              | Comma-separated proxy IPs or CIDRs. Forwarded client IPs on the public server are ignored unless the connecting proxy is trusted.                |
-| `ACCESS_LOG_EXPORT_URL`          | No              | Optional HTTPS destination for the access journal.                                                                                               |
-| `ACCESS_LOG_EXPORT_TOKEN`        | No              | Optional bearer credential for that destination. Give it append-only access at the collector.                                                    |
-| `AUDIT_EVENT_REPORTS_PER_MINUTE` | No              | Application event limit per client. Defaults to `600`.                                                                                           |
+Add a display name, client ID and client secret. Guard generates a unique,
+permanent slug from the name. Duplicate names receive a numeric suffix; renaming
+a provider keeps its existing slug. Choose one setup mode:
 
-Guard sessions last 18 hours. Password login allows five attempts per IP
-initially, then one more per minute. A container restart resets that login
-limit.
+- **OIDC discovery:** enter the full **OIDC configuration URL**, including the
+  JSON document path (usually `/.well-known/openid-configuration`). Guard reads
+  the issuer, authorization, token, user info and JWKS URLs from that document.
+- **Manual OIDC:** enter the exact issuer identifier, authorization URL, token
+  URL, user info URL and JWKS URL yourself. No discovery request is made.
+- **OAuth2:** enter the authorization, token and user info URLs yourself. This
+  mode does not require discovery, an ID token, an issuer or a JWKS endpoint.
+  Configure the profile's subject, email and email-verification field paths,
+  such as `account.id`, `emails.0.address` and `emails.0.verified`. Subjects may
+  be strings or numbers. Email verification must be a JSON boolean `true`.
 
-## Upstream OIDC login
+Use HTTPS, or HTTP on loopback for development. Token endpoint credentials are
+always sent in the Authorization header using HTTP Basic authentication. Choose the
+provider's required scopes and enable PKCE when supported. OIDC requires
+`openid`. Signing algorithms are selected automatically from supported algorithms
+advertised by discovery, or from supported algorithms compatible with the JWKS
+for manual setup. Guard supports
+RSA/RSASSA-PSS, P-256/P-384/P-521 ECDSA and Ed25519 signatures. All modes require
+a profile endpoint that returns a stable subject and a verified email address.
 
-Add one group of settings per provider to `guard.env`, then restart Guard.
-Use `OIDC_<NAME>_` as the prefix, with uppercase letters, digits and
-underscores in the name.
+Register the callback URL shown on the provider page, for example
+`https://auth.example.com/login/work/callback`. The slug stays fixed so callback
+URLs do not change. Client secrets are stored in PostgreSQL and never shown in
+the UI or audit data. Leave the secret field blank when editing to keep it.
+Protect database access and backups as credential-bearing material.
 
-```dotenv
-OIDC_PERSONAL_AUTHORIZE_URL=https://personal.example.com/authorize
-OIDC_PERSONAL_TOKEN_URL=https://personal.example.com/token
-OIDC_PERSONAL_USERINFO_URL=https://personal.example.com/userinfo
-OIDC_PERSONAL_CLIENT_ID=YOUR_PERSONAL_CLIENT_ID
-OIDC_PERSONAL_CLIENT_SECRET=YOUR_PERSONAL_CLIENT_SECRET
-OIDC_PERSONAL_SUPPORTS_PKCE=true
+For OIDC, Guard verifies the upstream ID token's signature, exact issuer, client audience,
+nonce and expiry; userinfo `sub` must match the signed subject. A verified email
+must match exactly one active local account. That account/email match is retained
+through MFA and rechecked before creating a Guard session. Accounts are created
+locally, not automatically provisioned. Saving provider changes, disabling it, or
+deleting it revokes its Guard sessions and pending logins. Existing endpoint
+settings remain editable if the provider is offline; use Refresh discovery to
+reload metadata explicitly.
 
-OIDC_WORK_AUTHORIZE_URL=https://provider.example.com/authorize
-OIDC_WORK_TOKEN_URL=https://provider.example.com/token
-OIDC_WORK_USERINFO_URL=https://provider.example.com/userinfo
-OIDC_WORK_CLIENT_ID=YOUR_WORK_CLIENT_ID
-OIDC_WORK_CLIENT_SECRET=YOUR_WORK_CLIENT_SECRET
-OIDC_WORK_SCOPES=openid profile email
-OIDC_WORK_SUPPORTS_PKCE=true
-```
+For OIDC providers, enable **Accept logout requests from this provider** and register the shown endpoint at the
+upstream provider, for example
+`https://auth.example.com/login/work/backchannel-logout`. Guard accepts signed
+form-encoded `logout_token` requests without browser cookies. It verifies issuer,
+audience, algorithm/signature, `iat`/`exp`, `jti`, logout event and `sub`/`sid`,
+rejects nonce and ID-token substitution, and handles retries idempotently. Logout
+tokens must be issued within five minutes (up to 60 seconds of future clock skew).
+Matching provider-derived sessions and pending MFA logins are revoked; password
+sessions and other providers' sessions remain active. Existing downstream
+back-channel logout notifications are queued in the same database transaction.
+Logout watermarks prevent delayed callbacks from restoring an ended session.
 
-Guard lists both providers on the login page. Register these callback URLs
-with their respective providers:
+JWKS are cached independently per provider for **24 hours**. An unknown `kid`
+can trigger an earlier refresh, throttled to once per ten seconds; provider
+configuration changes invalidate its cache. Slow key discovery at one provider
+does not block the others. Keys are fetched only from the configured JWKS URI,
+with bounded responses/timeouts and no redirects. A temporary key-fetch failure
+returns HTTP 503 so the upstream can retry; an invalid logout request returns HTTP 400.
 
-- Personal: `https://auth.example.com/login/personal/callback`
-- Work: `https://auth.example.com/login/work/callback`
+## Applications and administration
 
-The name in the callback path is the lowercase environment name. Underscores
-stay unchanged. The names `PASSWORD` and `MFA` are reserved.
+Use `/admin` for users, sessions, groups, clients, security logs and access logs.
+Password/role changes and disabling/deleting users revoke sessions and pending
+MFA. MFA management requires a recent login. TOTP secrets are encrypted with
+AES-GCM and bound to their owner; accepted time steps cannot be replayed.
+Recovery codes are single-use. Security keys use go-webauthn with expiring,
+browser/session-bound ceremonies. TOTP setup provides a manual secret and
+`otpauth://` link, rather than a generated QR image.
 
-Set `OIDC_WORK_DISPLAY_NAME=Work account` to change the label on the login
-page. The provider ID stays `work`, so its URLs do not change. Password
-login uses `/login/password` and appears as "Password".
-
-Each provider requires its authorize, token and userinfo URLs, client ID,
-and client secret. Scopes default to `openid profile email`. PKCE defaults
-to `false`; enable it if the provider supports it. Guard reports missing
-or invalid provider settings at startup.
-
-The previous single-provider settings still work. Keep
-`OIDC_PROVIDER_NAME` and the unprefixed settings such as `OIDC_CLIENT_ID`
-together. That provider's name must differ from any named provider.
-
-Create the local Guard accounts before signing in through a provider and
-set their email addresses in the user editor. Guard matches the provider's
-verified `email` claim to the account's email address, ignoring ASCII letter
-case. The provider must return `email_verified=true`; missing or unverified
-addresses cannot sign in. Include `email` in the requested scopes.
-
-Exactly one active account must match the address. Guard rejects ambiguous
-matches. Multiple providers can sign in to the same account when they verify
-the same email address. Usernames do not need a provider prefix or an
-upstream subject ID. This applies to both named providers and the legacy
-single-provider configuration.
-
-Keep password login enabled until you have verified access to an
-administrator account through a provider.
-
-## Administration and applications
-
-Open `/admin` to manage users, sessions, groups and clients. Disabling an
-account revokes its sessions. Password resets and administrator role changes
-have separate confirmation pages. Both sign the user out on every device.
-Administrators can also manage a user's MFA methods and backup codes.
-
-For OIDC applications, create an OpenID Connect client, register its exact
-callback URL, and copy the client ID, secret and discovery URL from its page.
-Each client has its own discovery URL:
+Create an OpenID Connect client and register its exact callback URLs. Discovery:
 
 ```text
 https://auth.example.com/oauth2/CLIENT_SLUG/.well-known/openid-configuration
 ```
 
-Use that discovery URL in the application. Guard supports authorization-code
-login with PKCE and refresh tokens. Available scopes are `openid`, `profile` and
-`email`.
+Supports authorization code, plain/S256 PKCE, RS256 ID tokens, rotating refresh
+tokens, userinfo and revocation. Replaying an authorization code or refresh token
+revokes the corresponding token family. Client rules apply to every grant and
+session check. Clients without rules allow all active signed-in users. Lower
+priority rules win; deny wins ties; unmatched users are denied when rules exist.
 
-For ForwardAuth applications, create a Forward auth client, register its allowed
-origins, and follow the [proxy setup guide](docs/forwardauth.md).
+Downstream OIDC apps can request `openid`, `profile`, `email`, and `groups`.
+The `groups` scope adds a `groups` array of active group names to ID tokens and
+UserInfo, sorted by name. No memberships produces `[]`; omitting the scope omits
+the claim. UserInfo reflects current memberships, and refreshed ID tokens use
+current memberships as well. Guard administrator permission is not exposed as
+an app role or group.
 
-Clients without access rules allow every signed-in user. Add group rules to
-restrict access. Lower priority numbers take precedence, and deny rules win
-ties. Once a client has rules, users who match none of them cannot access it.
+The home page includes an **App launcher** listing clients the signed-in user can
+access under the existing group rules. Each app opens the origin of its first
+registered redirect URI (or its first registered ForwardAuth origin). Callback
+paths and query strings are excluded. Apps without a registered URI appear
+without a launch link. The list updates when group access or membership changes.
 
-Users can enroll authenticator apps, security keys and backup codes under **My
-account > Manage security**. Security keys require HTTPS, except for local
-development on `http://localhost`. Save backup codes before leaving the page.
+For ForwardAuth, register each allowed origin (for example
+`https://app.example.com`, without a path). The proxy must supply exactly one
+`X-Forwarded-Proto`, `X-Forwarded-Host`, and `X-Forwarded-Uri` to the private
+listener, forward the browser's Cookie header, and propagate Set-Cookie and
+Location back to the browser. On success trust `X-Guard-User-Id` and
+`X-Guard-Username`; strip incoming copies of these identity headers.
 
-## Logs and backups
+Guard sends the browser through `/oauth2/authorize` and back to `/.guard/login`
+on the application origin. Route that callback through ForwardAuth too. Each
+flow is browser-bound, short-lived, and single-use. HTTPS application cookies
+use the `__Host-` prefix. For Nginx `auth_request`, call `/auth_request` and adapt
+a 401 with Location to an external 303, retaining the first Set-Cookie header.
+The callback itself also needs that adapter when sent as an auth subrequest.
+Caddy/Traefik redirect-capable checks may call `/` and propagate 303 directly.
 
-Administrators can view security events at `/admin/audit`. Each client can also
-enable detailed access records and session-bound application reports. View those
-records at `/admin/access-log`. See the
-[access journal guide](docs/access-journal.md) for collector configuration and
-the application event API.
+## Journals and application reports
 
-Guard removes expired authentication records in the background. It retains audit
-records and access journals, so allow disk space for them and monitor collector
-delivery if you enable export.
+Detailed request records and application reports are opt-in per client. The
+admin access log supports client, Guard session and source filters (`request`,
+`application`, `configuration`). Sensitive URL queries and credential fields
+are not recorded. Collector delivery uses an outbox, stable event IDs, bounded
+batches, and retries; collectors must deduplicate by `event_id`.
 
-Back up the data volume and `guard.env` together. Stop Guard before copying its
-database directory.
+Applications report events using HTTP Basic client authentication and a live
+application session/access token in the JSON body:
 
-```sh
-docker compose stop guard
-docker compose cp guard:/data ./guard-backup
-docker compose start guard
+```http
+POST /oauth2/event
+Authorization: Basic BASE64_CLIENT_ID_COLON_SECRET
+Content-Type: application/json
+
+{"session_token":"APPLICATION_TOKEN","report_id":"d54e3d5d-cf3c-4187-888a-4fa62db90ef5","event":"file.saved","outcome":"success","resource":"/files/42","metadata":{"size":1234}}
 ```
 
-Keep the backup private. It contains account data, credentials and
-authentication records. Save the MFA key with it. To restore, stop Guard and
-restore the data directory and environment file before starting it again.
+The body is limited to 8 KiB. Outcomes: `success`, `failure`, `denied`, `started`,
+`completed`. Optional `occurred_at` is RFC3339, bounded by the session and five
+minutes into the future. Metadata permits up to 24 scalar fields with bounded,
+nonsecret names/values. Identity and secret field names are rejected; URLs lose
+queries/fragments. A new report returns 202, an identical retry 200, a reused ID
+with changed content/session 409, and an exceeded per-client limit 429.
 
-## Updates
-
-Back up Guard before upgrading. Startup applies database upgrades. If you need
-to roll back after a database upgrade, restore the matching database backup too.
-
-```sh
-docker compose pull
-docker compose up -d
-```
-
-The image workflow publishes `latest` from the repository's default branch and
-`sha-<commit>` for each published build. A tag such as `v1.2.3` publishes image
-tags `1.2.3` and `1.2`. Pin a version or image digest when you want to control
-upgrades. Pull requests build the image without publishing it.
-
-To build an image locally:
+## Development and verification
 
 ```sh
-docker build -t guard:local .
-export GUARD_IMAGE=guard:local
-docker compose up -d
+sqlc generate       # sqlc 1.31.1; generated files are committed
+sqlc vet
+go test ./...
+go vet ./...
+go build ./cmd/guard
+
+# Use a dedicated test database: tests create/drop isolated schemas.
+export GUARD_TEST_DATABASE_URL='postgres://guard:password@localhost:5432/guard_test?sslmode=disable'
+go test -race ./...
 ```
+
+Without `GUARD_TEST_DATABASE_URL`, integration tests skip explicitly. Tests cover
+password sessions, administration, OAuth signing/grants/concurrent replay,
+TOTP/recovery replay, ceremony binding, ForwardAuth completion, application
+report deduplication/rate limits and collector retries. A software authenticator also verifies enrollment and signed WebAuthn login end to end. Physical security-key interoperability requires a browser and authenticator.
+
+`internal/ids` defines distinct integer types for all entity identities. sqlc's
+per-column overrides propagate those types to primary keys, foreign keys and
+query parameters, including nullable IDs. SQL lives in `sql/queries`, embedded
+migrations in `internal/db/migrations`. The module is
+`github.com/le0developer/guard`.
+
+CI in `.github/workflows/image.yml` checks formatting, sqlc regeneration, vet,
+PostgreSQL race tests and builds on Go 1.26 and 1.27. Container builds for
+`linux/amd64` and `linux/arm64` run after these checks. Pull requests build images
+without publishing. The default branch publishes `latest`; published builds also
+receive a commit tag, and `v*` release tags produce version tags. Images publish
+to `ghcr.io/le0developer/guard`. The Docker build cross-compiles Go on the native
+builder without QEMU and packages a static binary in a nonroot runtime image.
+
+## Backend session checks and logout
+
+Applications with their own session cookies can check Guard on the server with
+`POST /oauth2/introspect`. Authenticate using HTTP Basic with the client ID and
+secret (`client_secret_basic`), or form fields `client_id` and `client_secret`
+(`client_secret_post`), and send a form-encoded `token` containing an access or
+refresh token. Tokens are scoped to their issuing client. Unknown, expired,
+revoked, or inaccessible tokens return `{"active":false}`; Guard also checks the
+underlying session, account state, and current access rules. A storage failure
+returns HTTP 503, which must not be treated as a successful validation.
+
+For example, check at session creation and cache a positive result for at most
+30 seconds, bounded by the returned `exp`. Check again after the cache expires
+and end the application's session when `active` is false. Choose the interval
+according to the acceptable revocation delay; a successful check is only a
+snapshot. Keep the client secret and these requests on the backend. Guard does
+not implement iframe session monitoring.
+
+To receive logout notifications, edit an OpenID Connect client under
+`/admin/clients` and set its optional **Logout URI** and **Require session
+identifier (sid)** checkbox. Use an absolute HTTPS endpoint without credentials,
+fragments, wildcards, whitespace, backslashes or control characters (maximum
+2048 bytes). Explicit ports must be between 1 and 65535. HTTP is allowed
+only for localhost or loopback development. Switching to Forward auth clears
+these settings; secret rotation preserves them. Client discovery advertises
+`introspection_endpoint`, supported introspection authentication methods,
+`backchannel_logout_supported`, and `backchannel_logout_session_supported`.
+
+Guard sends a form-encoded `logout_token` to the configured endpoint. This is an
+RS256-signed JWT with `typ: logout+jwt` and claims `iss`, `aud`, `iat`, `exp`,
+`jti`, `sub`, `sid`, and
+`events: {"http://schemas.openid.net/event/backchannel-logout": {}}`; it contains
+no `nonce`. The application must verify the signature using its issuer's JWKS,
+allow only the expected algorithm and token type, check issuer, audience, time
+bounds and logout event, reject any nonce, and prevent replay using `jti` until
+the token expires. Match `sid` against the `sid` received in the ID token for
+that application's session, and terminate that session in the application's
+own store. Guard always includes `sid`, including when session-required is set.
+Treat repeat delivery of the same logout event idempotently.
+
+Notifications are durable and delivered at least once when a Guard session ends
+through logout, administrator or MFA revocation, or expiry. Return HTTP 200 or
+204 after processing. Network failures, HTTP 408, 429 and 5xx responses are retried
+with backoff for up to 24 hours. Other 4xx responses stop delivery; redirects are
+never followed. Changing or removing the configured endpoint cancels pending
+deliveries for the former endpoint. Keep introspection checks where a bounded
+revocation delay matters: callbacks can fail or exhaust the retry window.
+
+Existing application sessions enter this tracking when Guard issues or refreshes
+an ID token containing `sid`; sign in again after upgrading if needed. A worker
+crash releases its claim after 30 seconds. In-flight deliveries may already have
+started when endpoint settings change.
