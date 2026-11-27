@@ -348,15 +348,13 @@ func (a *App) oauthAuthorize(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	v, ok := a.user(r)
-	reauth := prompt == "login" || ok && f.Has("max_age") && (age == 0 || uint64(max(0, time.Now().Unix()-v.Session.CreatedAt.Unix())) > age)
+	reauth := prompt == "login" || ok && f.Has("max_age") && (age == 0 || v.Session.AuthTime <= 0 || uint64(max(0, time.Now().Unix()-v.Session.AuthTime)) > age)
 	if !ok || reauth {
 		if prompt == "none" {
 			failure("login_required")
 			return
 		}
-		f.Del("prompt")
-		f.Del("max_age")
-		http.Redirect(w, r, "/login?r="+url.QueryEscape("/oauth2/authorize?"+f.Encode()), 303)
+		http.Redirect(w, r, oauthLoginRedirect(f), 303)
 		return
 	}
 	code := security.Token()
@@ -513,7 +511,9 @@ func (a *App) oauthMint(ctx context.Context, q *db.Queries, c db.Client, v *iden
 		claims["aud"] = c.ClientID
 		claims["iat"] = now.Unix()
 		claims["exp"] = t.AccessExpiresAt.Unix()
-		claims["auth_time"] = t.AuthTime
+		if t.AuthTime > 0 {
+			claims["auth_time"] = t.AuthTime
+		}
 		if t.Nonce != "" {
 			claims["nonce"] = t.Nonce
 		}
@@ -616,7 +616,7 @@ func (a *App) oauthToken(w http.ResponseWriter, r *http.Request) {
 			if v.Session.ExpiresAt.Before(expiry) {
 				expiry = v.Session.ExpiresAt
 			}
-			t = db.CreateOAuthTokenParams{ClientID: c.ID, UserID: code.UserID, SessionID: code.SessionID, CodeID: code.ID, Family: security.Token(), Scope: code.Scope, Nonce: code.Nonce, AuthTime: v.Session.CreatedAt.Unix(), ExpiresAt: expiry}
+			t = db.CreateOAuthTokenParams{ClientID: c.ID, UserID: code.UserID, SessionID: code.SessionID, CodeID: code.ID, Family: security.Token(), Scope: code.Scope, Nonce: code.Nonce, AuthTime: v.Session.AuthTime, ExpiresAt: expiry}
 			out, e = a.oauthMint(ctx, q, c, v, t)
 			return e
 		case "refresh_token":
@@ -667,7 +667,7 @@ func (a *App) oauthToken(w http.ResponseWriter, r *http.Request) {
 			if e = q.OAuthRevokeToken(ctx, old.ID); e != nil {
 				return e
 			}
-			t = db.CreateOAuthTokenParams{ClientID: c.ID, UserID: old.UserID, SessionID: old.SessionID, CodeID: old.CodeID, Family: old.Family, Scope: scope, Nonce: old.Nonce, AuthTime: old.AuthTime, ExpiresAt: old.ExpiresAt}
+			t = db.CreateOAuthTokenParams{ClientID: c.ID, UserID: old.UserID, SessionID: old.SessionID, CodeID: old.CodeID, Family: old.Family, Scope: scope, Nonce: old.Nonce, AuthTime: v.Session.AuthTime, ExpiresAt: old.ExpiresAt}
 			out, e = a.oauthMint(ctx, q, c, v, t)
 			return e
 		default:

@@ -35,3 +35,6 @@ DELETE FROM signing_keys WHERE expires_at < now();
 
 -- name: PendingDeliveries :many
 SELECT * FROM access_log_deliveries WHERE delivered_at IS NULL AND next_attempt_at <= now() ORDER BY log_id LIMIT 100;
+
+-- name: SetSessionAuthTime :exec
+UPDATE sessions SET auth_time = $2 WHERE id = $1;

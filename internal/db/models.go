@@ -247,6 +247,7 @@ type Session struct {
 	TokenHash string        `json:"token_hash"`
 	CreatedAt time.Time     `json:"created_at"`
 	ExpiresAt time.Time     `json:"expires_at"`
+	AuthTime  int64         `json:"auth_time"`
 }
 
 type SigningKey struct {

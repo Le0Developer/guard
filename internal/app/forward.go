@@ -177,16 +177,14 @@ func (a *App) authorizeForward(w http.ResponseWriter, r *http.Request, c db.Clie
 			a.fail(w, r, 400, "Invalid max_age.")
 			return
 		}
-		force = force || ok && time.Since(v.Session.CreatedAt) > n
+		force = force || ok && (v.Session.AuthTime <= 0 || n == 0 || time.Since(time.Unix(v.Session.AuthTime, 0)) > n)
 	}
 	if !ok || force {
 		if prompt == "none" {
 			jsonResponse(w, 400, map[string]string{"error": "login_required"})
 			return
 		}
-		fields.Del("prompt")
-		fields.Del("max_age")
-		http.Redirect(w, r, "/login?r="+queryEscape("/oauth2/authorize?"+fields.Encode()), 303)
+		http.Redirect(w, r, oauthLoginRedirect(fields), 303)
 		return
 	}
 	code := security.Token()

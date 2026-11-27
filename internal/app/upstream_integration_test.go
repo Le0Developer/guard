@@ -28,6 +28,7 @@ type upstreamFixture struct {
 	server          *httptest.Server
 	nonce           atomic.Value
 	userinfoSubject atomic.Value
+	authTime        atomic.Value
 	issuedAt        int64
 }
 
@@ -63,7 +64,11 @@ func newUpstreamFixture(t *testing.T) *upstreamFixture {
 			if !ok || clientID != "upstream-client" || secret != "upstream-secret" || r.FormValue("client_secret") != "" || r.FormValue("client_id") != "" {
 				t.Error("missing upstream client authentication")
 			}
-			id := upstreamSigned(t, f.key, "JWT", map[string]any{"iss": f.server.URL, "aud": "upstream-client", "sub": "remote-alice", "sid": "upstream-session", "iat": f.issuedAt, "exp": time.Now().Add(5 * time.Minute).Unix(), "nonce": f.nonce.Load().(string)})
+			claims := map[string]any{"iss": f.server.URL, "aud": "upstream-client", "sub": "remote-alice", "sid": "upstream-session", "iat": f.issuedAt, "exp": time.Now().Add(5 * time.Minute).Unix(), "nonce": f.nonce.Load().(string)}
+			if authTime := f.authTime.Load(); authTime != nil {
+				claims["auth_time"] = authTime
+			}
+			id := upstreamSigned(t, f.key, "JWT", claims)
 			json.NewEncoder(w).Encode(map[string]string{"access_token": "upstream-access", "id_token": id})
 		case "/userinfo":
 			json.NewEncoder(w).Encode(map[string]any{"sub": f.userinfoSubject.Load().(string), "email": "alice@example.com", "email_verified": true})
@@ -83,8 +88,11 @@ func newUpstreamFixture(t *testing.T) *upstreamFixture {
 	return f
 }
 func (f *upstreamFixture) begin(t *testing.T) (*http.Cookie, url.Values) {
+	return f.beginWithQuery(t, nil)
+}
+func (f *upstreamFixture) beginWithQuery(t *testing.T, query url.Values) (*http.Cookie, url.Values) {
 	t.Helper()
-	r := httptest.NewRequest("GET", "/login/work", nil)
+	r := httptest.NewRequest("GET", "/login/work?"+query.Encode(), nil)
 	r.SetPathValue("method", f.p.Slug)
 	w := httptest.NewRecorder()
 	f.a.login(w, r)

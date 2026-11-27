@@ -38,7 +38,7 @@ const (
 
 type upstreamClaims struct {
 	Issuer, Subject, SessionID, JWTID string
-	IssuedAt, ExpiresAt               int64
+	IssuedAt, ExpiresAt, AuthTime     int64
 }
 type upstreamKey struct {
 	kid, alg string
@@ -231,6 +231,11 @@ func (a *App) verifyUpstreamJWT(ctx context.Context, p db.UpstreamProvider, raw 
 	}
 	switch purpose {
 	case upstreamIDToken:
+		if raw, exists := c["auth_time"]; exists {
+			if json.Unmarshal(raw, &out.AuthTime) != nil || out.AuthTime <= 0 || out.AuthTime > now+60 || out.AuthTime > out.IssuedAt+60 {
+				return invalid()
+			}
+		}
 		n, ok := str("nonce")
 		if !ok || nonce == "" || n != nonce || out.Subject == "" {
 			return invalid()

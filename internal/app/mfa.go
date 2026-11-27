@@ -138,7 +138,7 @@ func (a *App) mfaError(w http.ResponseWriter, r *http.Request, e error) {
 		} else if r.URL.Path == "/account/security" || strings.HasPrefix(r.URL.Path, "/account/security/") {
 			base = "/account/security"
 		}
-		http.Redirect(w, r, "/login?r="+url.QueryEscape(base), 303)
+		http.Redirect(w, r, "/login?prompt=login&r="+url.QueryEscape(base), 303)
 		return
 	}
 	if errors.Is(e, errMFAForbidden) {
@@ -312,7 +312,7 @@ func (a *App) mfaContext(r *http.Request, q *db.Queries) (mfaContext, error) {
 	if e != nil {
 		return c, e
 	}
-	if actor.Disabled || actor.DeletedAt != nil || session.UserID != actor.ID || !session.ExpiresAt.After(time.Now()) || session.CreatedAt.Add(5*time.Minute).Before(time.Now()) {
+	if actor.Disabled || actor.DeletedAt != nil || session.UserID != actor.ID || !session.ExpiresAt.After(time.Now()) || session.CreatedAt.Add(5*time.Minute).Before(time.Now()) || session.AuthTime <= 0 || time.Unix(session.AuthTime, 0).Add(5*time.Minute).Before(time.Now()) {
 		return c, errMFARecent
 	}
 	if targetID != actor.ID && actor.Role != "Admin" {

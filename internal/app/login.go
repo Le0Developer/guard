@@ -14,6 +14,7 @@ import (
 	"log/slog"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -82,7 +83,24 @@ func (a *App) login(w http.ResponseWriter, r *http.Request) {
 		a.fail(w, r, 404, "Password login is disabled.")
 		return
 	}
-	state := upstreamLoginState{}
+	params, err := url.ParseQuery(r.URL.RawQuery)
+	if err != nil || !oauthUnique(params) || params.Get("prompt") != "" && params.Get("prompt") != "login" {
+		a.fail(w, r, 400, "Invalid login parameters.")
+		return
+	}
+	state := upstreamLoginState{ForceLogin: params.Get("prompt") == "login"}
+	if params.Has("max_age") {
+		age, err := strconv.ParseUint(params.Get("max_age"), 10, 64)
+		if err != nil {
+			a.fail(w, r, 400, "Invalid max_age.")
+			return
+		}
+		state.MaxAge = &age
+	}
+	if selected != nil && selected.ConfigurationMode == "oauth2" && (state.ForceLogin || state.MaxAge != nil) {
+		a.fail(w, r, 400, "This provider cannot verify authentication freshness. Choose password login or an OpenID Connect provider.")
+		return
+	}
 	if selected != nil {
 		state.Nonce = security.Token()
 		state.ProviderID = selected.ID
@@ -114,6 +132,13 @@ func (a *App) login(w http.ResponseWriter, r *http.Request) {
 		q.Set("state", upstreamState(login.InternalToken, p.Slug))
 		if p.ConfigurationMode != "oauth2" {
 			q.Set("nonce", state.Nonce)
+			if state.MaxAge != nil {
+				q.Set("max_age", strconv.FormatUint(*state.MaxAge, 10))
+			}
+			if state.ForceLogin {
+				q.Set("prompt", "login")
+				q.Set("max_age", "0")
+			}
 		}
 		if p.Pkce {
 			q.Set("code_challenge", security.Hash(login.InternalToken))
@@ -135,7 +160,7 @@ func (a *App) login(w http.ResponseWriter, r *http.Request) {
 	if !a.Config.PasswordDisabled {
 		choices = append(choices, choice{"password", "Password"})
 	}
-	a.page(w, r, "Sign in", loginChoicesTemplate, map[string]any{"Choices": choices, "Redirect": login.RedirectUri})
+	a.page(w, r, "Sign in", loginChoicesTemplate, map[string]any{"Choices": choices, "Redirect": login.RedirectUri, "Prompt": params.Get("prompt"), "MaxAge": params.Get("max_age")})
 }
 func (a *App) passwordPage(w http.ResponseWriter, r *http.Request, login db.LoginSession, message string) {
 	a.page(w, r, "Sign in", passwordTemplate, map[string]any{"Login": login, "Error": message})
@@ -255,6 +280,13 @@ func (a *App) finishLogin(w http.ResponseWriter, r *http.Request, user db.User, 
 			return err
 		}
 		if binding != nil {
+			var state upstreamLoginState
+			if err = json.Unmarshal(locked.State, &state); err != nil {
+				return err
+			}
+			if err = q.SetSessionAuthTime(r.Context(), db.SetSessionAuthTimeParams{ID: issued.ID, AuthTime: state.AuthTime}); err != nil {
+				return err
+			}
 			if err = q.BindUpstreamSession(r.Context(), db.BindUpstreamSessionParams{SessionID: issued.ID, ProviderID: binding.ProviderID, Subject: binding.Subject, Sid: binding.Sid, ProviderRevision: binding.ProviderRevision, TokenIssuedAt: binding.TokenIssuedAt}); err != nil {
 				return err
 			}
@@ -396,6 +428,10 @@ func (a *App) upstreamCallback(w http.ResponseWriter, r *http.Request) {
 			}
 			return
 		}
+	}
+	if !upstreamAuthenticationFresh(identityClaims, state, login.CreatedAt) {
+		a.fail(w, r, 403, "The upstream provider did not confirm a sufficiently recent authentication.")
+		return
 	}
 	req, err = http.NewRequestWithContext(r.Context(), "GET", p.UserinfoUrl, nil)
 	if err != nil {

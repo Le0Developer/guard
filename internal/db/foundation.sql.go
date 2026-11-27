@@ -230,6 +230,20 @@ func (q *Queries) PendingDeliveries(ctx context.Context) ([]AccessLogDelivery, e
 	return items, nil
 }
 
+const setSessionAuthTime = `-- name: SetSessionAuthTime :exec
+UPDATE sessions SET auth_time = $2 WHERE id = $1
+`
+
+type SetSessionAuthTimeParams struct {
+	ID       ids.SessionID `json:"id"`
+	AuthTime int64         `json:"auth_time"`
+}
+
+func (q *Queries) SetSessionAuthTime(ctx context.Context, arg SetSessionAuthTimeParams) error {
+	_, err := q.db.Exec(ctx, setSessionAuthTime, arg.ID, arg.AuthTime)
+	return err
+}
+
 const usersByEmail = `-- name: UsersByEmail :many
 SELECT id, username, email, password, role, disabled, mfa_revision, mfa_failures, mfa_window, webauthn_user_id, created_at, updated_at, deleted_at FROM users WHERE lower(email) = lower($1) AND NOT disabled AND deleted_at IS NULL LIMIT 2
 `

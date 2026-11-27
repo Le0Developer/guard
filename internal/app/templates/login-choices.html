@@ -1,7 +1,7 @@
 <p>Choose a sign-in method.</p>
 {{range .Data.Choices}}
   <p>
-    <a role="button" class="btn btn-secondary btn-outline" href="/login/{{.ID}}?r={{$.Data.Redirect}}">Continue with {{.Name}}</a>
+    <a role="button" class="btn btn-secondary btn-outline" href="/login/{{.ID}}?r={{$.Data.Redirect}}{{if $.Data.Prompt}}&prompt={{$.Data.Prompt}}{{end}}{{if $.Data.MaxAge}}&max_age={{$.Data.MaxAge}}{{end}}">Continue with {{.Name}}</a>
   </p>
 {{else}}
   <p>No login methods are configured.</p>

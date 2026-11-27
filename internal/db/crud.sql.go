@@ -1004,7 +1004,7 @@ func (q *Queries) CreateRecoveryCode(ctx context.Context, arg CreateRecoveryCode
 }
 
 const createSession = `-- name: CreateSession :one
-INSERT INTO sessions (user_id, token_hash, expires_at) VALUES ($1, $2, $3) RETURNING id, user_id, token_hash, created_at, expires_at
+INSERT INTO sessions (user_id, token_hash, expires_at) VALUES ($1, $2, $3) RETURNING id, user_id, token_hash, created_at, expires_at, auth_time
 `
 
 type CreateSessionParams struct {
@@ -1022,6 +1022,7 @@ func (q *Queries) CreateSession(ctx context.Context, arg CreateSessionParams) (S
 		&i.TokenHash,
 		&i.CreatedAt,
 		&i.ExpiresAt,
+		&i.AuthTime,
 	)
 	return i, err
 }
@@ -1968,7 +1969,7 @@ func (q *Queries) GetRecoveryCode(ctx context.Context, id ids.RecoveryCodeID) (R
 }
 
 const getSession = `-- name: GetSession :one
-SELECT id, user_id, token_hash, created_at, expires_at FROM sessions WHERE id = $1
+SELECT id, user_id, token_hash, created_at, expires_at, auth_time FROM sessions WHERE id = $1
 `
 
 func (q *Queries) GetSession(ctx context.Context, id ids.SessionID) (Session, error) {
@@ -1980,6 +1981,7 @@ func (q *Queries) GetSession(ctx context.Context, id ids.SessionID) (Session, er
 		&i.TokenHash,
 		&i.CreatedAt,
 		&i.ExpiresAt,
+		&i.AuthTime,
 	)
 	return i, err
 }
@@ -2587,7 +2589,7 @@ func (q *Queries) ListRecoveryCodes(ctx context.Context) ([]RecoveryCode, error)
 }
 
 const listSessions = `-- name: ListSessions :many
-SELECT id, user_id, token_hash, created_at, expires_at FROM sessions ORDER BY id
+SELECT id, user_id, token_hash, created_at, expires_at, auth_time FROM sessions ORDER BY id
 `
 
 func (q *Queries) ListSessions(ctx context.Context) ([]Session, error) {
@@ -2605,6 +2607,7 @@ func (q *Queries) ListSessions(ctx context.Context) ([]Session, error) {
 			&i.TokenHash,
 			&i.CreatedAt,
 			&i.ExpiresAt,
+			&i.AuthTime,
 		); err != nil {
 			return nil, err
 		}
@@ -3380,7 +3383,7 @@ func (q *Queries) LockRecoveryCodeByHash(ctx context.Context, hash string) (Reco
 }
 
 const lockSession = `-- name: LockSession :one
-SELECT id, user_id, token_hash, created_at, expires_at FROM sessions WHERE id = $1 FOR UPDATE
+SELECT id, user_id, token_hash, created_at, expires_at, auth_time FROM sessions WHERE id = $1 FOR UPDATE
 `
 
 func (q *Queries) LockSession(ctx context.Context, id ids.SessionID) (Session, error) {
@@ -3392,12 +3395,13 @@ func (q *Queries) LockSession(ctx context.Context, id ids.SessionID) (Session, e
 		&i.TokenHash,
 		&i.CreatedAt,
 		&i.ExpiresAt,
+		&i.AuthTime,
 	)
 	return i, err
 }
 
 const lockSessionByTokenHash = `-- name: LockSessionByTokenHash :one
-SELECT id, user_id, token_hash, created_at, expires_at FROM sessions WHERE token_hash = $1 FOR UPDATE
+SELECT id, user_id, token_hash, created_at, expires_at, auth_time FROM sessions WHERE token_hash = $1 FOR UPDATE
 `
 
 func (q *Queries) LockSessionByTokenHash(ctx context.Context, tokenHash string) (Session, error) {
@@ -3409,6 +3413,7 @@ func (q *Queries) LockSessionByTokenHash(ctx context.Context, tokenHash string) 
 		&i.TokenHash,
 		&i.CreatedAt,
 		&i.ExpiresAt,
+		&i.AuthTime,
 	)
 	return i, err
 }
@@ -3882,7 +3887,7 @@ func (q *Queries) RecoveryCodesByUserId(ctx context.Context, userID ids.UserID) 
 }
 
 const sessionByTokenHash = `-- name: SessionByTokenHash :one
-SELECT id, user_id, token_hash, created_at, expires_at FROM sessions WHERE token_hash = $1
+SELECT id, user_id, token_hash, created_at, expires_at, auth_time FROM sessions WHERE token_hash = $1
 `
 
 func (q *Queries) SessionByTokenHash(ctx context.Context, tokenHash string) (Session, error) {
@@ -3894,12 +3899,13 @@ func (q *Queries) SessionByTokenHash(ctx context.Context, tokenHash string) (Ses
 		&i.TokenHash,
 		&i.CreatedAt,
 		&i.ExpiresAt,
+		&i.AuthTime,
 	)
 	return i, err
 }
 
 const sessionsByUserId = `-- name: SessionsByUserId :many
-SELECT id, user_id, token_hash, created_at, expires_at FROM sessions WHERE user_id = $1 ORDER BY id
+SELECT id, user_id, token_hash, created_at, expires_at, auth_time FROM sessions WHERE user_id = $1 ORDER BY id
 `
 
 func (q *Queries) SessionsByUserId(ctx context.Context, userID ids.UserID) ([]Session, error) {
@@ -3917,6 +3923,7 @@ func (q *Queries) SessionsByUserId(ctx context.Context, userID ids.UserID) ([]Se
 			&i.TokenHash,
 			&i.CreatedAt,
 			&i.ExpiresAt,
+			&i.AuthTime,
 		); err != nil {
 			return nil, err
 		}
@@ -4557,7 +4564,7 @@ func (q *Queries) UpdateRecoveryCode(ctx context.Context, arg UpdateRecoveryCode
 }
 
 const updateSession = `-- name: UpdateSession :one
-UPDATE sessions SET user_id = $1, token_hash = $2, expires_at = $3 WHERE id = $4 RETURNING id, user_id, token_hash, created_at, expires_at
+UPDATE sessions SET user_id = $1, token_hash = $2, expires_at = $3 WHERE id = $4 RETURNING id, user_id, token_hash, created_at, expires_at, auth_time
 `
 
 type UpdateSessionParams struct {
@@ -4581,6 +4588,7 @@ func (q *Queries) UpdateSession(ctx context.Context, arg UpdateSessionParams) (S
 		&i.TokenHash,
 		&i.CreatedAt,
 		&i.ExpiresAt,
+		&i.AuthTime,
 	)
 	return i, err
 }

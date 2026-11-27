@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"github.com/jackc/pgx/v5"
 	"github.com/le0developer/guard/internal/db"
@@ -19,6 +20,9 @@ type upstreamLoginState struct {
 	Nonce      string                 `json:"nonce"`
 	ProviderID ids.UpstreamProviderID `json:"provider_id"`
 	Revision   int64                  `json:"revision"`
+	ForceLogin bool                   `json:"force_login,omitempty"`
+	MaxAge     *uint64                `json:"max_age,omitempty"`
+	AuthTime   int64                  `json:"auth_time,omitempty"`
 }
 
 func (a *App) provider(ctx context.Context, slug string) (db.UpstreamProvider, error) {
@@ -84,6 +88,18 @@ func (a *App) saveUpstreamBinding(ctx context.Context, p db.UpstreamProvider, us
 		}
 		if !locked.ExpiresAt.After(time.Now()) {
 			return errUpstreamSessionChanged
+		}
+		var state upstreamLoginState
+		if err = json.Unmarshal(locked.State, &state); err != nil {
+			return err
+		}
+		state.AuthTime = c.AuthTime
+		encoded, err := json.Marshal(state)
+		if err != nil {
+			return err
+		}
+		if _, err = q.UpdateLoginSession(ctx, db.UpdateLoginSessionParams{ID: locked.ID, TokenHash: locked.TokenHash, InternalToken: locked.InternalToken, RedirectUri: locked.RedirectUri, Provider: locked.Provider, State: encoded, ExpiresAt: locked.ExpiresAt}); err != nil {
+			return err
 		}
 		if err = q.BindUpstreamPendingLogin(ctx, db.BindUpstreamPendingLoginParams{LoginSessionID: login.ID, ProviderID: p.ID, UserID: user.ID, MatchedEmail: user.Email, Subject: c.Subject, Sid: c.SessionID, ProviderRevision: p.Revision, TokenIssuedAt: c.IssuedAt}); err != nil {
 			return err

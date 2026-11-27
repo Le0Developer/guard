@@ -57,6 +57,9 @@ func TestUpstreamJWTBoundaries(t *testing.T) {
 		t.Fatal(e)
 	}
 	cases := map[string]func(map[string]any){"issuer": func(c map[string]any) { c["iss"] = "other" }, "audience": func(c map[string]any) { c["aud"] = "other" }, "nonce": func(c map[string]any) { c["nonce"] = "other" }, "expired": func(c map[string]any) { c["exp"] = time.Now().Unix() - 1 }, "future": func(c map[string]any) { c["iat"] = time.Now().Unix() + 100 }, "multi audience": func(c map[string]any) { c["aud"] = []string{"guard", "other"} }, "null sid": func(c map[string]any) { c["sid"] = nil }}
+	for name, value := range map[string]any{"null auth_time": nil, "string auth_time": "123", "fractional auth_time": 1.5, "negative auth_time": -1, "future auth_time": time.Now().Unix() + 120} {
+		cases[name] = func(c map[string]any) { c["auth_time"] = value }
+	}
 	for _, field := range []string{"sub", "sid", "jti"} {
 		cases["empty "+field] = func(c map[string]any) { c[field] = "" }
 	}
