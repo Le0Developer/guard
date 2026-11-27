@@ -366,8 +366,9 @@ that identity provider's settings. Keep the Cloudflare OIDC `groups` claim and
 Guard's `groups` scope configured for group-based Access policies.
 
 Guard provisions active users permitted by that client's group access rules.
-Without rules, this includes all active users. Every assigned user needs a valid,
-unique email address, including administrators if assigned. Map `userName` and
+Without rules, this includes all active users with an email address. Users without
+an email are skipped and excluded from synchronized group membership. Non-empty
+email addresses must still be valid and unique. Map `userName` and
 primary `emails` to email, `displayName` to the Guard username, and `externalId`
 to a stable per-client identity. All active Guard groups are synchronized,
 including empty groups; membership includes only assigned users. Accounts are

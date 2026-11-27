@@ -169,7 +169,7 @@ func (a *App) scimSnapshot(ctx context.Context, cfg *db.ScimConfig) ([]scimJob, 
 	active := map[ids.UserID]string{}
 	emailCounts := map[string]int{}
 	for _, u := range users {
-		if !u.Disabled && u.DeletedAt == nil {
+		if !u.Disabled && u.DeletedAt == nil && strings.TrimSpace(u.Email) != "" {
 			emailCounts[strings.ToLower(u.Email)]++
 		}
 	}
@@ -178,7 +178,7 @@ func (a *App) scimSnapshot(ctx context.Context, cfg *db.ScimConfig) ([]scimJob, 
 	for _, u := range users {
 		ext := "guard:user:" + a.oidcSubject(client, u.ID)
 		permitted := false
-		if !u.Disabled && u.DeletedAt == nil {
+		if !u.Disabled && u.DeletedAt == nil && strings.TrimSpace(u.Email) != "" {
 			permitted, err = a.permitted(ctx, q, cfg.ClientID, u.ID)
 			if err != nil {
 				return nil, err

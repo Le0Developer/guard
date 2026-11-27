@@ -513,3 +513,43 @@ func TestSCIMSyncClientConversionStopsDelivery(t *testing.T) {
 		t.Fatalf("converted client delivered %v %v", worked, err)
 	}
 }
+
+func TestSCIMSyncSkipsUsersWithoutEmail(t *testing.T) {
+	a, c, u, f := setupSCIM(t)
+	ctx := context.Background()
+	// Bootstrap administrators and other accounts without email must not block sync.
+	if _, err := a.Pool.Exec(ctx, `UPDATE users SET disabled=false WHERE username='system'`); err != nil {
+		t.Fatal(err)
+	}
+	blank, err := a.Q.CreateUser(ctx, db.CreateUserParams{Username: "no-email", Email: "", Role: "User", WebauthnUserID: []byte{3}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	g, err := a.Q.CreateGroup(ctx, db.CreateGroupParams{Name: "Team"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, id := range []ids.UserID{u.ID, blank.ID} {
+		if _, err = a.Q.CreateGroupMember(ctx, db.CreateGroupMemberParams{GroupID: g.ID, UserID: id}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	drainSCIM(t, a)
+	cfg, err := a.Q.GetSCIMConfig(ctx, c.ID)
+	if err != nil || cfg.Blocked || cfg.LastSuccessAt == nil {
+		t.Fatalf("email-less users blocked sync: %#v %v", cfg, err)
+	}
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if len(f.resources) != 2 {
+		t.Fatalf("expected Alice and Team, got %#v", f.resources)
+	}
+	for key, v := range f.resources {
+		if strings.HasPrefix(key, "Users/") && v["userName"] != "alice@example.org" {
+			t.Fatal("provisioned email-less user")
+		}
+		if strings.HasPrefix(key, "Groups/") && len(v["members"].([]any)) != 1 {
+			t.Fatal("email-less member included in group")
+		}
+	}
+}
