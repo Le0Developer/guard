@@ -190,5 +190,10 @@ func (a *App) home(w http.ResponseWriter, r *http.Request) {
 		a.serverError(w, r, err)
 		return
 	}
-	a.page(w, r, "My account", homeTemplate, map[string]any{"Account": v.User, "Apps": apps})
+	preview, err := a.userinfoSimulation(r, v.User)
+	if err != nil {
+		a.serverError(w, r, err)
+		return
+	}
+	a.page(w, r, "My account", homeTemplate, map[string]any{"Account": v.User, "Apps": apps, "Preview": preview})
 }

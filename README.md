@@ -209,6 +209,10 @@ the claim. UserInfo reflects current memberships, and refreshed ID tokens use
 current memberships as well. Guard administrator permission is not exposed as
 an app role or group.
 
+The dashboard also includes a **UserInfo simulator**. Select an accessible OIDC
+client and scopes to see your current UserInfo JSON, including that client’s
+`sub`, using the same claims as the UserInfo endpoint.
+
 The home page includes an **App launcher** listing clients the signed-in user can
 access under the existing group rules. Each app opens the origin of its first
 registered redirect URI (or its first registered ForwardAuth origin). Callback

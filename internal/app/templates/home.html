@@ -42,3 +42,32 @@
     </dl>
   </section>
 </div>
+
+{{with .Data.Preview}}
+<hr>
+<section aria-labelledby="userinfo-heading">
+  <h2 id="userinfo-heading">UserInfo simulator</h2>
+  <p>See your current UserInfo for a client and the scopes it requests.</p>
+  {{if .Error}}<p role="alert">{{.Error}}</p>{{end}}
+  {{if .Clients}}
+    <form method="get" action="/#userinfo-heading">
+      <label for="preview-client">Client</label>
+      <select id="preview-client" name="preview_client">
+        {{range .Clients}}
+          <option value="{{.ID}}" {{if .Selected}}selected{{end}}>{{.Name}}</option>
+        {{end}}
+      </select>
+      <label for="preview-scope">Scopes</label>
+      <input id="preview-scope" name="preview_scope" value="{{.Scope}}" aria-describedby="preview-scope-help">
+      <small id="preview-scope-help">Supported scopes: openid, profile, email, groups. UserInfo requires openid.</small>
+      <button type="submit" class="btn btn-info">Preview UserInfo</button>
+    </form>
+    {{if .JSON}}
+      <label for="userinfo-json">UserInfo JSON</label>
+      <textarea id="userinfo-json" rows="14" readonly spellcheck="false">{{.JSON}}</textarea>
+    {{end}}
+  {{else}}
+    <p>No OIDC clients available.</p>
+  {{end}}
+</section>
+{{end}}
