@@ -50,7 +50,18 @@ func (a *App) requestIP(r *http.Request) string {
 		return false
 	}
 	if trusted(ip) {
-		chain := strings.Split(r.Header.Get("X-Forwarded-For"), ",")
+		forwarded := r.Header.Values("X-Forwarded-For")
+		if len(forwarded) == 0 {
+			// Only a trusted peer may supply the single-address fallback.
+			if values := r.Header.Values("X-Real-IP"); len(values) == 1 {
+				if v, err := netip.ParseAddr(strings.TrimSpace(values[0])); err == nil {
+					return v.Unmap().String()
+				}
+			}
+			return ip.String()
+		}
+		// Repeated fields form one ordered chain, just like comma-separated values.
+		chain := strings.Split(strings.Join(forwarded, ","), ",")
 		for i := len(chain) - 1; i >= 0; i-- {
 			v, e := netip.ParseAddr(strings.TrimSpace(chain[i]))
 			if e != nil {

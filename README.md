@@ -214,6 +214,17 @@ listener, forward the browser's Cookie header, and propagate Set-Cookie and
 Location back to the browser. On success trust `X-Guard-User-Id` and
 `X-Guard-Username`; strip incoming copies of these identity headers.
 
+To recover the client IP, set `AUDIT_TRUSTED_PROXIES` to the IP addresses or
+CIDRs of the proxies connecting to Guard. Guard walks all `X-Forwarded-For`
+header values from right to left and stops at the first untrusted address.
+If that header is absent, it accepts a single `X-Real-IP` from a trusted peer.
+Configure the proxy to overwrite `X-Real-IP` and overwrite or safely append to
+`X-Forwarded-For`. Forwarded IP headers from untrusted peers are ignored.
+With Docker port publishing, the peer may be the Docker gateway rather than
+`127.0.0.1`; configure the address Guard actually receives. The recovered IP
+is used for login rate limits, login audit events, and OAuth2/ForwardAuth
+access records.
+
 Guard sends the browser through `/oauth2/authorize` and back to `/.guard/login`
 on the application origin. Route that callback through ForwardAuth too. Each
 flow is browser-bound, short-lived, and single-use. HTTPS application cookies

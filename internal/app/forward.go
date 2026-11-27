@@ -363,7 +363,7 @@ func (a *App) forwardVerify(w http.ResponseWriter, r *http.Request) {
 			a.serverError(w, r, err)
 			return
 		}
-		if err = a.recordAccess(r.Context(), c, f.UserID, f.SessionID, "forwardauth", map[string]any{"decision": "allowed", "path": forwardCallback, "origin": origin, "status": 303}); err != nil {
+		if err = a.recordAccess(r.Context(), c, f.UserID, f.SessionID, "forwardauth", map[string]any{"decision": "allowed", "path": forwardCallback, "origin": origin, "status": 303, "client_ip": a.requestIP(r)}); err != nil {
 			journalUnavailable(w)
 			return
 		}
@@ -401,7 +401,7 @@ func (a *App) forwardVerify(w http.ResponseWriter, r *http.Request) {
 					return
 				}
 				if !allowed {
-					if err := a.recordAccess(r.Context(), c, &v.User.ID, &s.SessionID, "forwardauth", map[string]any{"decision": "denied", "path": u.Path, "origin": origin, "status": 403}); err != nil {
+					if err := a.recordAccess(r.Context(), c, &v.User.ID, &s.SessionID, "forwardauth", map[string]any{"decision": "denied", "path": u.Path, "origin": origin, "status": 403, "client_ip": a.requestIP(r)}); err != nil {
 						journalUnavailable(w)
 						return
 					}
@@ -410,7 +410,7 @@ func (a *App) forwardVerify(w http.ResponseWriter, r *http.Request) {
 				}
 				w.Header().Set("X-Guard-User-Id", fmt.Sprint(v.User.ID))
 				w.Header().Set("X-Guard-Username", v.User.Username)
-				if err := a.recordAccess(r.Context(), c, &v.User.ID, &s.SessionID, "forwardauth", map[string]any{"decision": "allowed", "path": u.Path, "origin": origin, "status": 200}); err != nil {
+				if err := a.recordAccess(r.Context(), c, &v.User.ID, &s.SessionID, "forwardauth", map[string]any{"decision": "allowed", "path": u.Path, "origin": origin, "status": 200, "client_ip": a.requestIP(r)}); err != nil {
 					journalUnavailable(w)
 					return
 				}
@@ -425,7 +425,7 @@ func (a *App) forwardVerify(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	forwardSetCookie(w, origin, flowCookie(state, origin), browser, 300)
-	if err := a.recordAccess(r.Context(), c, nil, nil, "forwardauth", map[string]any{"decision": "authentication_required", "path": u.Path, "origin": origin, "status": 303}); err != nil {
+	if err := a.recordAccess(r.Context(), c, nil, nil, "forwardauth", map[string]any{"decision": "authentication_required", "path": u.Path, "origin": origin, "status": 303, "client_ip": a.requestIP(r)}); err != nil {
 		journalUnavailable(w)
 		return
 	}

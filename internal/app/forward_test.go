@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"encoding/json"
 	"github.com/le0developer/guard/internal/db"
 	"github.com/le0developer/guard/internal/security"
 	"net/http/httptest"
@@ -68,5 +69,43 @@ func TestForwardBrowserBindingAndReplay(t *testing.T) {
 	}
 	if _, _, _, err = a.forwardFinish(ctx, "https://app.example.com", state, rawCode, browser); err == nil {
 		t.Fatal("accepted replay")
+	}
+}
+
+func TestForwardAccessRecordsClientIP(t *testing.T) {
+	a := testApp(t)
+	ctx := context.Background()
+	a.Config.TrustedProxies = []string{"127.0.0.1"}
+	c, err := a.Q.CreateClient(ctx, db.CreateClientParams{Name: "IP log", Slug: "ip-log", ClientType: "ForwardAuth", ClientID: "ip-log", ClientSecret: "secret", SessionLifetimeS: 600, DetailedLogging: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := a.Q.CreateClientRedirect(ctx, db.CreateClientRedirectParams{ClientID: c.ID, RedirectUri: "https://app.example.com"}); err != nil {
+		t.Fatal(err)
+	}
+	r := httptest.NewRequest("GET", "/", nil)
+	r.RemoteAddr = "127.0.0.1:1234"
+	r.Header.Set("X-Forwarded-For", "203.0.113.7")
+	r.Header.Set("X-Forwarded-Proto", "https")
+	r.Header.Set("X-Forwarded-Host", "app.example.com")
+	r.Header.Set("X-Forwarded-Uri", "/private")
+	w := httptest.NewRecorder()
+	a.ForwardHandler().ServeHTTP(w, r)
+	if w.Code != 303 {
+		t.Fatalf("status = %d: %s", w.Code, w.Body.String())
+	}
+	logs, err := a.Q.ListAccessLogs(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(logs) != 1 {
+		t.Fatalf("got %d logs", len(logs))
+	}
+	var data map[string]any
+	if err := json.Unmarshal(logs[0].Data, &data); err != nil {
+		t.Fatal(err)
+	}
+	if data["client_ip"] != "203.0.113.7" {
+		t.Fatalf("client_ip = %v", data["client_ip"])
 	}
 }

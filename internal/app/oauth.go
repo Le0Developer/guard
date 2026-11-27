@@ -170,7 +170,7 @@ func (a *App) oauthDiscovery(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	b := strings.TrimRight(a.Config.Domain, "/") + "/oauth2"
-	jsonResponse(w, 200, map[string]any{"issuer": a.oauthIssuer(c), "authorization_endpoint": b + "/authorize", "token_endpoint": b + "/token", "userinfo_endpoint": b + "/userinfo", "revocation_endpoint": b + "/revoke", "event_endpoint": b + "/event", "response_modes_supported": []string{"query"}, "revocation_endpoint_auth_methods_supported": []string{"client_secret_basic", "client_secret_post"}, "request_parameter_supported": false, "request_uri_parameter_supported": false, "introspection_endpoint": b + "/introspect", "introspection_endpoint_auth_methods_supported": []string{"client_secret_basic", "client_secret_post"}, "backchannel_logout_supported": true, "backchannel_logout_session_supported": true, "claims_supported": []string{"sid", "iss", "sub", "aud", "iat", "exp", "auth_time", "nonce", "name", "preferred_username", "email", "groups"}, "jwks_uri": a.oauthIssuer(c) + "/jwks", "response_types_supported": []string{"code"}, "grant_types_supported": []string{"authorization_code", "refresh_token"}, "subject_types_supported": []string{"public"}, "id_token_signing_alg_values_supported": []string{"RS256"}, "token_endpoint_auth_methods_supported": []string{"client_secret_basic", "client_secret_post"}, "code_challenge_methods_supported": []string{"plain", "S256"}, "scopes_supported": []string{"openid", "profile", "email", "groups"}})
+	jsonResponse(w, 200, map[string]any{"issuer": a.oauthIssuer(c), "authorization_endpoint": b + "/authorize", "token_endpoint": b + "/token", "userinfo_endpoint": b + "/userinfo", "revocation_endpoint": b + "/revoke", "event_endpoint": b + "/event", "response_modes_supported": []string{"query"}, "revocation_endpoint_auth_methods_supported": []string{"client_secret_basic", "client_secret_post"}, "request_parameter_supported": false, "request_uri_parameter_supported": false, "introspection_endpoint": b + "/introspect", "introspection_endpoint_auth_methods_supported": []string{"client_secret_basic", "client_secret_post"}, "backchannel_logout_supported": true, "backchannel_logout_session_supported": true, "claims_supported": []string{"sid", "iss", "sub", "aud", "iat", "exp", "auth_time", "nonce", "name", "username", "preferred_username", "email", "groups"}, "jwks_uri": a.oauthIssuer(c) + "/jwks", "response_types_supported": []string{"code"}, "grant_types_supported": []string{"authorization_code", "refresh_token"}, "subject_types_supported": []string{"public"}, "id_token_signing_alg_values_supported": []string{"RS256"}, "token_endpoint_auth_methods_supported": []string{"client_secret_basic", "client_secret_post"}, "code_challenge_methods_supported": []string{"plain", "S256"}, "scopes_supported": []string{"openid", "profile", "email", "groups"}})
 }
 func (a *App) oauthKey(ctx context.Context, q *db.Queries, c db.Client) (db.SigningKey, *rsa.PrivateKey, error) {
 	ks, e := q.SigningKeysByClientId(ctx, c.ID)
@@ -446,6 +446,7 @@ func oauthIdentity(u db.User, scope string) map[string]any {
 	v := map[string]any{"sub": fmt.Sprint(u.ID)}
 	for _, s := range strings.Fields(scope) {
 		if s == "profile" {
+			v["username"] = u.Username
 			v["preferred_username"] = u.Username
 			v["name"] = u.Username
 		}

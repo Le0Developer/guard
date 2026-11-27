@@ -53,7 +53,7 @@ func TestOAuthClaimsScope(t *testing.T) {
 		t.Fatalf("claims leaked: %v", v)
 	}
 	v = oauthIdentity(u, "profile email")
-	if v["name"] != "alice" || v["email"] != u.Email {
+	if v["username"] != u.Username || v["preferred_username"] != u.Username || v["name"] != "alice" || v["email"] != u.Email {
 		t.Fatalf("claims missing %v", v)
 	}
 }
