@@ -248,3 +248,46 @@ func (q *Queries) AdminSaveRule(ctx context.Context, arg AdminSaveRuleParams) er
 	)
 	return err
 }
+
+const lockClientsForGroupDeletion = `-- name: LockClientsForGroupDeletion :exec
+LOCK TABLE clients IN EXCLUSIVE MODE
+`
+
+// Serialize client creation and row locks before locking the group.
+func (q *Queries) LockClientsForGroupDeletion(ctx context.Context) error {
+	_, err := q.db.Exec(ctx, lockClientsForGroupDeletion)
+	return err
+}
+
+const setClientDisabled = `-- name: SetClientDisabled :one
+UPDATE clients SET disabled = $2, updated_at = now() WHERE id = $1 RETURNING id, name, slug, client_type, client_id, client_secret, session_lifetime_s, require_pkce, detailed_logging, allow_event_reports, created_at, updated_at, deleted_at, backchannel_logout_uri, backchannel_logout_session_required, disabled
+`
+
+type SetClientDisabledParams struct {
+	ID       ids.ClientID `json:"id"`
+	Disabled bool         `json:"disabled"`
+}
+
+func (q *Queries) SetClientDisabled(ctx context.Context, arg SetClientDisabledParams) (Client, error) {
+	row := q.db.QueryRow(ctx, setClientDisabled, arg.ID, arg.Disabled)
+	var i Client
+	err := row.Scan(
+		&i.ID,
+		&i.Name,
+		&i.Slug,
+		&i.ClientType,
+		&i.ClientID,
+		&i.ClientSecret,
+		&i.SessionLifetimeS,
+		&i.RequirePkce,
+		&i.DetailedLogging,
+		&i.AllowEventReports,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.DeletedAt,
+		&i.BackchannelLogoutUri,
+		&i.BackchannelLogoutSessionRequired,
+		&i.Disabled,
+	)
+	return i, err
+}

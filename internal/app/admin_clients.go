@@ -77,6 +77,10 @@ func (a *App) adminWriteClient(w http.ResponseWriter, r *http.Request, actor *id
 		if e != nil {
 			return e
 		}
+		c, e = q.SetClientDisabled(r.Context(), db.SetClientDisabledParams{ID: id, Disabled: r.PostForm.Has("disabled")})
+		if e != nil {
+			return e
+		}
 		c, e = q.SetClientBackchannelLogout(r.Context(), db.SetClientBackchannelLogoutParams{ID: id, BackchannelLogoutUri: logoutURI, BackchannelLogoutSessionRequired: logoutRequired})
 		if e != nil {
 			return e

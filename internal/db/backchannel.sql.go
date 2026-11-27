@@ -244,7 +244,7 @@ func (q *Queries) RetryLogoutDelivery(ctx context.Context, arg RetryLogoutDelive
 }
 
 const setClientBackchannelLogout = `-- name: SetClientBackchannelLogout :one
-UPDATE clients SET backchannel_logout_uri = $2, backchannel_logout_session_required = $3, updated_at=now() WHERE id=$1 RETURNING id, name, slug, client_type, client_id, client_secret, session_lifetime_s, require_pkce, detailed_logging, allow_event_reports, created_at, updated_at, deleted_at, backchannel_logout_uri, backchannel_logout_session_required
+UPDATE clients SET backchannel_logout_uri = $2, backchannel_logout_session_required = $3, updated_at=now() WHERE id=$1 RETURNING id, name, slug, client_type, client_id, client_secret, session_lifetime_s, require_pkce, detailed_logging, allow_event_reports, created_at, updated_at, deleted_at, backchannel_logout_uri, backchannel_logout_session_required, disabled
 `
 
 type SetClientBackchannelLogoutParams struct {
@@ -272,6 +272,7 @@ func (q *Queries) SetClientBackchannelLogout(ctx context.Context, arg SetClientB
 		&i.DeletedAt,
 		&i.BackchannelLogoutUri,
 		&i.BackchannelLogoutSessionRequired,
+		&i.Disabled,
 	)
 	return i, err
 }

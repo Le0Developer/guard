@@ -152,7 +152,7 @@ func (a *App) oauthIssuer(c db.Client) string {
 }
 func (a *App) oauthClient(r *http.Request) (db.Client, error) {
 	c, e := a.Q.ClientBySlug(r.Context(), r.PathValue("slug"))
-	if e == nil && (c.DeletedAt != nil || c.ClientType != "Oidc") {
+	if e == nil && (c.Disabled || c.DeletedAt != nil || c.ClientType != "Oidc") {
 		e = oauthInvalid
 	}
 	return c, e
@@ -260,7 +260,7 @@ func (a *App) oauthAuthorize(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	c, e := a.Q.ClientByClientId(r.Context(), f.Get("client_id"))
-	if e != nil || c.DeletedAt != nil {
+	if e != nil || c.Disabled || c.DeletedAt != nil {
 		if e != nil && !notFound(e) {
 			a.oauthServerError(w, r, e)
 			return
@@ -365,7 +365,7 @@ func (a *App) oauthAuthorize(w http.ResponseWriter, r *http.Request) {
 		if e != nil {
 			return e
 		}
-		if locked.DeletedAt != nil || locked.ClientType != "Oidc" {
+		if locked.Disabled || locked.DeletedAt != nil || locked.ClientType != "Oidc" {
 			return oauthInvalid
 		}
 		c = locked
@@ -438,7 +438,7 @@ func (a *App) oauthAuthenticate(ctx context.Context, q *db.Queries, r *http.Requ
 	if e != nil {
 		return c, e
 	}
-	if c.DeletedAt != nil || c.ClientType != "Oidc" || secret == "" || !security.Equal(secret, c.ClientSecret) {
+	if c.Disabled || c.DeletedAt != nil || c.ClientType != "Oidc" || secret == "" || !security.Equal(secret, c.ClientSecret) {
 		return c, oauthInvalid
 	}
 	return c, nil
@@ -710,7 +710,7 @@ func (a *App) oauthUserinfo(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	oauthSubject(r, c, &t.UserID, &t.SessionID)
-	if c.DeletedAt != nil || c.ClientType != "Oidc" {
+	if c.Disabled || c.DeletedAt != nil || c.ClientType != "Oidc" {
 		oauthError(w, "invalid_token")
 		return
 	}

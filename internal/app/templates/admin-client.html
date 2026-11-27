@@ -38,6 +38,11 @@
       Accept session-bound application events
     </label>
   </fieldset>
+  <label>
+    <input type="checkbox" name="disabled" {{if .Data.Target.Disabled}}checked{{end}}>
+    Disable this client
+  </label>
+  <p>Clients are disabled automatically when deleting a group removes their last access rule. Review access rules before enabling them again.</p>
   <button class="btn btn-info">Save client</button>
 </form>
 {{if not .Data.New}}

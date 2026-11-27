@@ -73,7 +73,7 @@
                   Forward auth
                 {{end}}
               </td>
-              <td>{{.Count}}</td>
+              <td>{{.Count}}{{if .Disabled}} <span class="badge badge-warning">Disabled</span>{{end}}</td>
             {{end}}
             <td>
               <a class="c-info" href="/admin/{{$.Data.Section}}/{{.ID}}">

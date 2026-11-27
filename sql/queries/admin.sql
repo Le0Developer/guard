@@ -53,3 +53,10 @@ ORDER BY id DESC LIMIT 101;
 SELECT count(*) FILTER (WHERE delivered_at IS NULL)::bigint AS pending,
 count(*) FILTER (WHERE delivered_at IS NULL AND last_error <> '')::bigint AS failed
 FROM access_log_deliveries;
+
+-- name: LockClientsForGroupDeletion :exec
+-- Serialize client creation and row locks before locking the group.
+LOCK TABLE clients IN EXCLUSIVE MODE;
+
+-- name: SetClientDisabled :one
+UPDATE clients SET disabled = $2, updated_at = now() WHERE id = $1 RETURNING *;

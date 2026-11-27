@@ -4,6 +4,7 @@
   ?
 </p>
 <p>Access and related memberships or client credentials will be removed. The record is retained for audit history.</p>
+{{if eq .Data.Section "groups"}}<p>Applications whose last access rule belongs to this group will be disabled.</p>{{end}}
 <form method="post">
   {{template "csrf" $}}
   <button class="btn btn-error">Confirm deletion</button>

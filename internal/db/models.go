@@ -70,6 +70,7 @@ type Client struct {
 	DeletedAt                        *time.Time   `json:"deleted_at"`
 	BackchannelLogoutUri             string       `json:"backchannel_logout_uri"`
 	BackchannelLogoutSessionRequired bool         `json:"backchannel_logout_session_required"`
+	Disabled                         bool         `json:"disabled"`
 }
 
 type ClientAccessRule struct {

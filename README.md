@@ -24,11 +24,18 @@ go run ./cmd/guard
 Save `MFA_ENCRYPTION_KEY` securely and keep it through restarts. Startup applies
 embedded SQL migrations and prints a random password for the initial `system`
 administrator once. Treat those logs as sensitive. Create your own administrator
-and enroll MFA at `/security`.
+and enroll MFA at `/security`. The initial `system` account can then be disabled
+from `/admin/users/0`; its password, role, authenticators, and sessions can be
+managed there like other accounts.
 
 The public service listens on port 4444; the separate private ForwardAuth service
 listens on `127.0.0.1:4445` by default. Use HTTPS outside loopback development.
 No environment file is loaded by the binary; export settings or use Compose.
+
+Deleting a group automatically disables any client that loses its last access
+rule. Disabled clients reject authentication and token use and are hidden from
+the launcher. Review their access rules before clearing **Disable this client**
+in the client settings to restore access.
 
 ## Docker Compose
 

@@ -326,7 +326,7 @@ func (q *Queries) AuthorizationCodesByUserId(ctx context.Context, userID ids.Use
 }
 
 const clientByClientId = `-- name: ClientByClientId :one
-SELECT id, name, slug, client_type, client_id, client_secret, session_lifetime_s, require_pkce, detailed_logging, allow_event_reports, created_at, updated_at, deleted_at, backchannel_logout_uri, backchannel_logout_session_required FROM clients WHERE client_id = $1
+SELECT id, name, slug, client_type, client_id, client_secret, session_lifetime_s, require_pkce, detailed_logging, allow_event_reports, created_at, updated_at, deleted_at, backchannel_logout_uri, backchannel_logout_session_required, disabled FROM clients WHERE client_id = $1
 `
 
 func (q *Queries) ClientByClientId(ctx context.Context, clientID string) (Client, error) {
@@ -348,12 +348,13 @@ func (q *Queries) ClientByClientId(ctx context.Context, clientID string) (Client
 		&i.DeletedAt,
 		&i.BackchannelLogoutUri,
 		&i.BackchannelLogoutSessionRequired,
+		&i.Disabled,
 	)
 	return i, err
 }
 
 const clientBySlug = `-- name: ClientBySlug :one
-SELECT id, name, slug, client_type, client_id, client_secret, session_lifetime_s, require_pkce, detailed_logging, allow_event_reports, created_at, updated_at, deleted_at, backchannel_logout_uri, backchannel_logout_session_required FROM clients WHERE slug = $1
+SELECT id, name, slug, client_type, client_id, client_secret, session_lifetime_s, require_pkce, detailed_logging, allow_event_reports, created_at, updated_at, deleted_at, backchannel_logout_uri, backchannel_logout_session_required, disabled FROM clients WHERE slug = $1
 `
 
 func (q *Queries) ClientBySlug(ctx context.Context, slug string) (Client, error) {
@@ -375,6 +376,7 @@ func (q *Queries) ClientBySlug(ctx context.Context, slug string) (Client, error)
 		&i.DeletedAt,
 		&i.BackchannelLogoutUri,
 		&i.BackchannelLogoutSessionRequired,
+		&i.Disabled,
 	)
 	return i, err
 }
@@ -409,7 +411,7 @@ func (q *Queries) ClientRedirectsByClientId(ctx context.Context, clientID ids.Cl
 }
 
 const clientsByClientId = `-- name: ClientsByClientId :many
-SELECT id, name, slug, client_type, client_id, client_secret, session_lifetime_s, require_pkce, detailed_logging, allow_event_reports, created_at, updated_at, deleted_at, backchannel_logout_uri, backchannel_logout_session_required FROM clients WHERE client_id = $1 ORDER BY id
+SELECT id, name, slug, client_type, client_id, client_secret, session_lifetime_s, require_pkce, detailed_logging, allow_event_reports, created_at, updated_at, deleted_at, backchannel_logout_uri, backchannel_logout_session_required, disabled FROM clients WHERE client_id = $1 ORDER BY id
 `
 
 func (q *Queries) ClientsByClientId(ctx context.Context, clientID string) ([]Client, error) {
@@ -437,6 +439,7 @@ func (q *Queries) ClientsByClientId(ctx context.Context, clientID string) ([]Cli
 			&i.DeletedAt,
 			&i.BackchannelLogoutUri,
 			&i.BackchannelLogoutSessionRequired,
+			&i.Disabled,
 		); err != nil {
 			return nil, err
 		}
@@ -593,7 +596,7 @@ func (q *Queries) CreateAuthorizationCode(ctx context.Context, arg CreateAuthori
 }
 
 const createClient = `-- name: CreateClient :one
-INSERT INTO clients (name, slug, client_type, client_id, client_secret, session_lifetime_s, require_pkce, detailed_logging, allow_event_reports, deleted_at) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING id, name, slug, client_type, client_id, client_secret, session_lifetime_s, require_pkce, detailed_logging, allow_event_reports, created_at, updated_at, deleted_at, backchannel_logout_uri, backchannel_logout_session_required
+INSERT INTO clients (name, slug, client_type, client_id, client_secret, session_lifetime_s, require_pkce, detailed_logging, allow_event_reports, deleted_at) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING id, name, slug, client_type, client_id, client_secret, session_lifetime_s, require_pkce, detailed_logging, allow_event_reports, created_at, updated_at, deleted_at, backchannel_logout_uri, backchannel_logout_session_required, disabled
 `
 
 type CreateClientParams struct {
@@ -639,6 +642,7 @@ func (q *Queries) CreateClient(ctx context.Context, arg CreateClientParams) (Cli
 		&i.DeletedAt,
 		&i.BackchannelLogoutUri,
 		&i.BackchannelLogoutSessionRequired,
+		&i.Disabled,
 	)
 	return i, err
 }
@@ -1721,7 +1725,7 @@ func (q *Queries) GetAuthorizationCode(ctx context.Context, id ids.Authorization
 }
 
 const getClient = `-- name: GetClient :one
-SELECT id, name, slug, client_type, client_id, client_secret, session_lifetime_s, require_pkce, detailed_logging, allow_event_reports, created_at, updated_at, deleted_at, backchannel_logout_uri, backchannel_logout_session_required FROM clients WHERE id = $1
+SELECT id, name, slug, client_type, client_id, client_secret, session_lifetime_s, require_pkce, detailed_logging, allow_event_reports, created_at, updated_at, deleted_at, backchannel_logout_uri, backchannel_logout_session_required, disabled FROM clients WHERE id = $1
 `
 
 func (q *Queries) GetClient(ctx context.Context, id ids.ClientID) (Client, error) {
@@ -1743,6 +1747,7 @@ func (q *Queries) GetClient(ctx context.Context, id ids.ClientID) (Client, error
 		&i.DeletedAt,
 		&i.BackchannelLogoutUri,
 		&i.BackchannelLogoutSessionRequired,
+		&i.Disabled,
 	)
 	return i, err
 }
@@ -2252,7 +2257,7 @@ func (q *Queries) ListClientRedirects(ctx context.Context) ([]ClientRedirect, er
 }
 
 const listClients = `-- name: ListClients :many
-SELECT id, name, slug, client_type, client_id, client_secret, session_lifetime_s, require_pkce, detailed_logging, allow_event_reports, created_at, updated_at, deleted_at, backchannel_logout_uri, backchannel_logout_session_required FROM clients ORDER BY id
+SELECT id, name, slug, client_type, client_id, client_secret, session_lifetime_s, require_pkce, detailed_logging, allow_event_reports, created_at, updated_at, deleted_at, backchannel_logout_uri, backchannel_logout_session_required, disabled FROM clients ORDER BY id
 `
 
 func (q *Queries) ListClients(ctx context.Context) ([]Client, error) {
@@ -2280,6 +2285,7 @@ func (q *Queries) ListClients(ctx context.Context) ([]Client, error) {
 			&i.DeletedAt,
 			&i.BackchannelLogoutUri,
 			&i.BackchannelLogoutSessionRequired,
+			&i.Disabled,
 		); err != nil {
 			return nil, err
 		}
@@ -2891,7 +2897,7 @@ func (q *Queries) LockAuthorizationCodeByTokenHash(ctx context.Context, tokenHas
 }
 
 const lockClient = `-- name: LockClient :one
-SELECT id, name, slug, client_type, client_id, client_secret, session_lifetime_s, require_pkce, detailed_logging, allow_event_reports, created_at, updated_at, deleted_at, backchannel_logout_uri, backchannel_logout_session_required FROM clients WHERE id = $1 FOR UPDATE
+SELECT id, name, slug, client_type, client_id, client_secret, session_lifetime_s, require_pkce, detailed_logging, allow_event_reports, created_at, updated_at, deleted_at, backchannel_logout_uri, backchannel_logout_session_required, disabled FROM clients WHERE id = $1 FOR UPDATE
 `
 
 func (q *Queries) LockClient(ctx context.Context, id ids.ClientID) (Client, error) {
@@ -2913,6 +2919,7 @@ func (q *Queries) LockClient(ctx context.Context, id ids.ClientID) (Client, erro
 		&i.DeletedAt,
 		&i.BackchannelLogoutUri,
 		&i.BackchannelLogoutSessionRequired,
+		&i.Disabled,
 	)
 	return i, err
 }
@@ -2940,7 +2947,7 @@ func (q *Queries) LockClientAccessRule(ctx context.Context, arg LockClientAccess
 }
 
 const lockClientByClientId = `-- name: LockClientByClientId :one
-SELECT id, name, slug, client_type, client_id, client_secret, session_lifetime_s, require_pkce, detailed_logging, allow_event_reports, created_at, updated_at, deleted_at, backchannel_logout_uri, backchannel_logout_session_required FROM clients WHERE client_id = $1 FOR UPDATE
+SELECT id, name, slug, client_type, client_id, client_secret, session_lifetime_s, require_pkce, detailed_logging, allow_event_reports, created_at, updated_at, deleted_at, backchannel_logout_uri, backchannel_logout_session_required, disabled FROM clients WHERE client_id = $1 FOR UPDATE
 `
 
 func (q *Queries) LockClientByClientId(ctx context.Context, clientID string) (Client, error) {
@@ -2962,12 +2969,13 @@ func (q *Queries) LockClientByClientId(ctx context.Context, clientID string) (Cl
 		&i.DeletedAt,
 		&i.BackchannelLogoutUri,
 		&i.BackchannelLogoutSessionRequired,
+		&i.Disabled,
 	)
 	return i, err
 }
 
 const lockClientBySlug = `-- name: LockClientBySlug :one
-SELECT id, name, slug, client_type, client_id, client_secret, session_lifetime_s, require_pkce, detailed_logging, allow_event_reports, created_at, updated_at, deleted_at, backchannel_logout_uri, backchannel_logout_session_required FROM clients WHERE slug = $1 FOR UPDATE
+SELECT id, name, slug, client_type, client_id, client_secret, session_lifetime_s, require_pkce, detailed_logging, allow_event_reports, created_at, updated_at, deleted_at, backchannel_logout_uri, backchannel_logout_session_required, disabled FROM clients WHERE slug = $1 FOR UPDATE
 `
 
 func (q *Queries) LockClientBySlug(ctx context.Context, slug string) (Client, error) {
@@ -2989,6 +2997,7 @@ func (q *Queries) LockClientBySlug(ctx context.Context, slug string) (Client, er
 		&i.DeletedAt,
 		&i.BackchannelLogoutUri,
 		&i.BackchannelLogoutSessionRequired,
+		&i.Disabled,
 	)
 	return i, err
 }
@@ -4136,7 +4145,7 @@ func (q *Queries) UpdateAuthorizationCode(ctx context.Context, arg UpdateAuthori
 }
 
 const updateClient = `-- name: UpdateClient :one
-UPDATE clients SET name = $1, slug = $2, client_type = $3, client_id = $4, client_secret = $5, session_lifetime_s = $6, require_pkce = $7, detailed_logging = $8, allow_event_reports = $9, deleted_at = $10, updated_at = now() WHERE id = $11 RETURNING id, name, slug, client_type, client_id, client_secret, session_lifetime_s, require_pkce, detailed_logging, allow_event_reports, created_at, updated_at, deleted_at, backchannel_logout_uri, backchannel_logout_session_required
+UPDATE clients SET name = $1, slug = $2, client_type = $3, client_id = $4, client_secret = $5, session_lifetime_s = $6, require_pkce = $7, detailed_logging = $8, allow_event_reports = $9, deleted_at = $10, updated_at = now() WHERE id = $11 RETURNING id, name, slug, client_type, client_id, client_secret, session_lifetime_s, require_pkce, detailed_logging, allow_event_reports, created_at, updated_at, deleted_at, backchannel_logout_uri, backchannel_logout_session_required, disabled
 `
 
 type UpdateClientParams struct {
@@ -4184,6 +4193,7 @@ func (q *Queries) UpdateClient(ctx context.Context, arg UpdateClientParams) (Cli
 		&i.DeletedAt,
 		&i.BackchannelLogoutUri,
 		&i.BackchannelLogoutSessionRequired,
+		&i.Disabled,
 	)
 	return i, err
 }

@@ -219,7 +219,7 @@ func (a *App) eventReport(w http.ResponseWriter, r *http.Request) {
 			}
 			return err
 		}
-		if c.DeletedAt != nil || secret == "" || !security.Equal(secret, c.ClientSecret) {
+		if c.Disabled || c.DeletedAt != nil || secret == "" || !security.Equal(secret, c.ClientSecret) {
 			return reportFailure{401, "invalid_client"}
 		}
 		if !c.AllowEventReports {

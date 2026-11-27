@@ -18,7 +18,7 @@ func (a *App) launcherApps(r *http.Request, user ids.UserID) ([]launcherApp, err
 	}
 	apps := []launcherApp{}
 	for _, client := range clients {
-		if client.DeletedAt != nil {
+		if client.Disabled || client.DeletedAt != nil {
 			continue
 		}
 		allowed, err := a.permitted(r.Context(), a.Q, client.ID, user)

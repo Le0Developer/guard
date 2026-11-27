@@ -31,7 +31,7 @@ func (a *App) userinfoSimulation(r *http.Request, user db.User) (userinfoPreview
 	selectedID := query.Get("preview_client")
 	var selected *db.Client
 	for _, client := range clients {
-		if client.DeletedAt != nil || client.ClientType != "Oidc" {
+		if client.Disabled || client.DeletedAt != nil || client.ClientType != "Oidc" {
 			continue
 		}
 		allowed, err := a.permitted(r.Context(), a.Q, client.ID, user.ID)

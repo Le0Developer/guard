@@ -25,7 +25,8 @@ func adminInvalid(s string) error  { return adminError{422, s} }
 func adminMissing() error          { return adminError{404, "Not found."} }
 func adminID[T ~int64](s string) (T, error) {
 	n, err := strconv.ParseInt(s, 10, 64)
-	if err != nil || n <= 0 {
+	_, userID := any(T(0)).(ids.UserID)
+	if err != nil || n < 0 || n == 0 && !userID {
 		return 0, adminMissing()
 	}
 	return T(n), nil

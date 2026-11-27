@@ -75,16 +75,16 @@ func (a *App) adminWrite(w http.ResponseWriter, r *http.Request, actor *identity
 	if email != "" && (len(email) > 254 || strings.Count(email, "@") != 1 || strings.HasPrefix(email, "@") || strings.HasSuffix(email, "@") || strings.IndexFunc(email, func(c rune) bool { return unicode.IsSpace(c) || unicode.IsControl(c) }) >= 0) {
 		return adminInvalid("Enter a valid email address.")
 	}
-	if id == actor.User.ID && disabled {
+	if raw != "" && id == actor.User.ID && disabled {
 		return adminInvalid("You cannot disable your own account.")
 	}
 	role := r.PostForm.Get("role")
 	password := r.PostForm.Get("password")
 	hash := ""
-	if id != 0 && (r.PostForm.Has("role") || r.PostForm.Has("password")) {
+	if raw != "" && (r.PostForm.Has("role") || r.PostForm.Has("password")) {
 		return adminInvalid("Use the separate role or password action to make that change.")
 	}
-	if id == 0 {
+	if raw == "" {
 		if role != "Admin" && role != "User" {
 			return adminInvalid("Choose User or Admin.")
 		}
@@ -99,7 +99,7 @@ func (a *App) adminWrite(w http.ResponseWriter, r *http.Request, actor *identity
 		}
 	}
 	err = a.adminMutation(r, actor, func() any { return id }, func(q *db.Queries) error {
-		if id == 0 {
+		if raw == "" {
 			u, e := q.CreateUser(ctx, db.CreateUserParams{Username: username, Email: email, Password: hash, Role: role, Disabled: disabled, MfaRevision: 0, MfaFailures: 0, MfaWindow: nil, WebauthnUserID: []byte(security.Token()), DeletedAt: nil})
 			id = u.ID
 			return e
@@ -338,9 +338,32 @@ func (a *App) adminDelete(w http.ResponseWriter, r *http.Request, actor *identit
 			if e != nil {
 				return e
 			}
+			// Acquire the table lock before any group or client row locks. This
+			// includes clients created concurrently and matches client-first edits.
+			if e := q.LockClientsForGroupDeletion(ctx); e != nil {
+				return e
+			}
+			clients, e := q.ListClients(ctx)
+			if e != nil {
+				return e
+			}
 			g, e := adminGroup(ctx, q, id, true)
 			if e != nil {
 				return e
+			}
+			for _, c := range clients {
+				rules, e := q.ClientAccessRulesByClientId(ctx, c.ID)
+				if e != nil {
+					return e
+				}
+				if len(rules) == 1 && rules[0].GroupID == id && c.DeletedAt == nil && !c.Disabled {
+					if _, e = q.SetClientDisabled(ctx, db.SetClientDisabledParams{ID: c.ID, Disabled: true}); e != nil {
+						return e
+					}
+					if e = a.audit(ctx, q, actor.User.ID, "ClientDisabled", map[string]any{"client_id": c.ID, "group_id": id, "reason": "last access rule removed"}); e != nil {
+						return e
+					}
+				}
 			}
 			if e = q.AdminDeleteGroupRules(ctx, id); e != nil {
 				return e

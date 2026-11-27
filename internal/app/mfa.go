@@ -285,7 +285,7 @@ func (a *App) mfaContext(r *http.Request, q *db.Queries) (mfaContext, error) {
 	targetID := v.User.ID
 	if r.PathValue("id") != "" {
 		n, e := strconv.ParseInt(r.PathValue("id"), 10, 64)
-		if e != nil || n <= 0 {
+		if e != nil || n < 0 {
 			return c, errMFA
 		}
 		targetID = ids.UserID(n)

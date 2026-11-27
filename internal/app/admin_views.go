@@ -111,7 +111,7 @@ func (a *App) adminList(w http.ResponseWriter, r *http.Request, section string) 
 					count++
 				}
 			}
-			rows = append(rows, adminRow{ID: fmt.Sprint(c.ID), Name: c.Name, Identifier: c.ClientID, Kind: c.ClientType, Count: count, Detail: fmt.Sprintf("%s · %s · %d rules", c.ClientType, c.ClientID, count)})
+			rows = append(rows, adminRow{ID: fmt.Sprint(c.ID), Name: c.Name, Identifier: c.ClientID, Kind: c.ClientType, Disabled: c.Disabled, Count: count, Detail: fmt.Sprintf("%s · %s · %d rules", c.ClientType, c.ClientID, count)})
 		}
 	}
 	filtered := []adminRow{}

@@ -78,7 +78,7 @@ func forwardOriginal(r *http.Request) (string, string, error) {
 	return origin, origin + uri, nil
 }
 func (a *App) forwardAllowed(ctx context.Context, q *db.Queries, c db.Client, origin string) (bool, error) {
-	if c.ClientType != "ForwardAuth" || c.DeletedAt != nil {
+	if c.ClientType != "ForwardAuth" || c.Disabled || c.DeletedAt != nil {
 		return false, nil
 	}
 	redirects, err := q.ClientRedirectsByClientId(ctx, c.ID)

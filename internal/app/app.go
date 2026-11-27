@@ -127,6 +127,13 @@ func (a *App) audit(ctx context.Context, q *db.Queries, user ids.UserID, event s
 	return err
 }
 func (a *App) permitted(ctx context.Context, q *db.Queries, client ids.ClientID, user ids.UserID) (bool, error) {
+	c, err := q.GetClient(ctx, client)
+	if err != nil {
+		return false, err
+	}
+	if c.Disabled || c.DeletedAt != nil {
+		return false, nil
+	}
 	rules, err := q.ClientAccessRulesByClientId(ctx, client)
 	if err != nil {
 		return false, err
