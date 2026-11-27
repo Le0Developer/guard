@@ -5,7 +5,7 @@ use crate::{
     server::middleware::CsrfToken,
     token::generate_token,
     upstream_auth,
-    views::{ErrorPage, LoginPage},
+    views::{ErrorPage, LoginMethod, LoginPage},
 };
 use anyhow::bail;
 use axum::{
@@ -155,7 +155,7 @@ fn get_upstream_authenticator(
         Some(method) => state
             .upstream_authenticators
             .iter()
-            .find(|auth| auth.name() == method)
+            .find(|auth| auth.id() == method)
             .map(|auth| auth.as_ref()),
         None if state.upstream_authenticators.len() == 1 => {
             Some(state.upstream_authenticators[0].as_ref())
@@ -193,7 +193,10 @@ async fn show_login_page(ctx: &upstream_auth::Context<'_>, error: Option<String>
             .core
             .upstream_authenticators
             .iter()
-            .map(|u| u.name().into())
+            .map(|auth| LoginMethod {
+                id: auth.id().into(),
+                name: auth.name().into(),
+            })
             .collect(),
         fragment: None,
         error,

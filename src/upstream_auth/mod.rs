@@ -7,11 +7,12 @@ use crate::{
     models::{LoginSession, User},
 };
 
-pub mod form;
 pub mod oidc;
+pub mod password;
 
 #[async_trait]
 pub trait UpstreamAuthenticator: Send + Sync {
+    fn id(&self) -> &str;
     fn name(&self) -> &str;
     fn supports_callback(&self) -> bool {
         false

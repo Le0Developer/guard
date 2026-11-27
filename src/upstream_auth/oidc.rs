@@ -12,6 +12,7 @@ pub struct Oidc {
     token_url: String,
     userinfo_url: String,
 
+    provider_id: String,
     provider_name: String,
     client_id: String,
     client_secret: String,
@@ -23,6 +24,7 @@ pub struct Oidc {
 
 impl Oidc {
     pub fn new(
+        provider_id: String,
         provider_name: String,
         authorize_url: String,
         userinfo_url: String,
@@ -37,6 +39,7 @@ impl Oidc {
             authorize_url,
             token_url,
             userinfo_url,
+            provider_id,
             provider_name,
             client_id,
             client_secret,
@@ -55,6 +58,7 @@ impl Oidc {
             "CLIENT_SECRET",
             "SCOPES",
             "SUPPORTS_PKCE",
+            "DISPLAY_NAME",
         ];
         // Read once so discovery and loading see the same configuration.
         let env: BTreeMap<String, String> = std::env::vars_os()
@@ -114,10 +118,10 @@ impl Oidc {
                 || !name
                     .bytes()
                     .all(|c| c.is_ascii_alphanumeric() || matches!(c, b'_' | b'-'))
-                || matches!(name.to_ascii_lowercase().as_str(), "form" | "mfa")
+                || matches!(name.to_ascii_lowercase().as_str(), "password" | "mfa")
             {
                 anyhow::bail!(
-                    "Invalid OIDC provider name for {prefix}; use a URL name other than form or mfa"
+                    "Invalid OIDC provider name for {prefix}; use a URL ID other than password or mfa"
                 );
             }
             if !names.insert(name.to_ascii_lowercase()) {
@@ -162,8 +166,33 @@ impl Oidc {
                 Some("true") => true,
                 _ => anyhow::bail!("{prefix}SUPPORTS_PKCE must be true or false"),
             };
+            let display_name = match env.get(&format!("{prefix}DISPLAY_NAME")) {
+                Some(value)
+                    if value.trim().is_empty()
+                        || value.len() > 100
+                        || value.chars().any(char::is_control) =>
+                {
+                    anyhow::bail!(
+                        "{prefix}DISPLAY_NAME must contain 1–100 bytes without control characters"
+                    );
+                }
+                Some(value) => value.trim().to_owned(),
+                None => name
+                    .split(['_', '-'])
+                    .filter(|word| !word.is_empty())
+                    .map(|word| {
+                        let mut chars = word.chars();
+                        chars
+                            .next()
+                            .map(|first| first.to_uppercase().collect::<String>() + chars.as_str())
+                            .unwrap_or_default()
+                    })
+                    .collect::<Vec<_>>()
+                    .join(" "),
+            };
             let provider = Self::new(
                 name,
+                display_name,
                 authorize_url,
                 userinfo_url,
                 token_url,
@@ -181,7 +210,7 @@ impl Oidc {
         let mut mac = Hmac::<Sha256>::new_from_slice(ctx.login_session.internal_token.as_bytes())
             .expect("HMAC accepts the login secret");
         mac.update(b"guard-upstream-oidc-state\0");
-        mac.update(self.provider_name.as_bytes());
+        mac.update(self.id().as_bytes());
         mac
     }
 
@@ -214,7 +243,7 @@ impl Oidc {
         url.path_segments_mut()
             .map_err(|_| anyhow::anyhow!("DOMAIN must be an HTTP URL"))?
             .pop_if_empty()
-            .extend(["login", self.name(), "callback"]);
+            .extend(["login", self.id(), "callback"]);
         Ok(url.into())
     }
 
@@ -265,6 +294,9 @@ impl Oidc {
 
 #[async_trait]
 impl UpstreamAuthenticator for Oidc {
+    fn id(&self) -> &str {
+        &self.provider_id
+    }
     fn supports_callback(&self) -> bool {
         true
     }

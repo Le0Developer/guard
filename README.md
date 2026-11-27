@@ -127,7 +127,11 @@ with their respective providers:
 - Work: `https://auth.example.com/login/work/callback`
 
 The name in the callback path is the lowercase environment name. Underscores
-stay unchanged. The names `FORM` and `MFA` are reserved.
+stay unchanged. The names `PASSWORD` and `MFA` are reserved.
+
+Set `OIDC_WORK_DISPLAY_NAME=Work account` to change the label on the login
+page. The provider ID stays `work`, so its URLs do not change. Password
+login uses `/login/password` and appears as "Password".
 
 Each provider requires its authorize, token and userinfo URLs, client ID,
 and client secret. Scopes default to `openid profile email`. PKCE defaults

@@ -37,7 +37,7 @@ impl Core {
         for upstream in upstream_auth::oidc::Oidc::from_env()? {
             upstream_authenticators.push(Box::new(upstream));
         }
-        if let Ok(upstream) = upstream_auth::form::Form::from_env() {
+        if let Ok(upstream) = upstream_auth::password::Password::from_env() {
             upstream_authenticators.push(Box::new(upstream));
         }
 

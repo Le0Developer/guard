@@ -1,4 +1,4 @@
-@(authenticators: &Vec<String>, fragment: &Option<String>, error: &Option<String>)
+@(authenticators: &Vec<LoginMethod>, fragment: &Option<String>, error: &Option<String>)
 
 @use "../layout/main" as Layout
 
@@ -12,7 +12,7 @@
           @if let Some(err) = error { <div class="alert alert-error" role="alert">@err</div> }
           @if !authenticators.is_empty() {
             <p>Choose a sign-in method.</p>
-            @for auth in authenticators { <p><a href="/login/@auth" role="button" class="btn btn-secondary btn-outline">Continue with @auth</a></p> }
+            @for auth in authenticators { <p><a href="/login/@(auth.id)" role="button" class="btn btn-secondary btn-outline">Continue with @(auth.name)</a></p> }
           }
           @if let Some(frag) = fragment { @#frag }
         </article>

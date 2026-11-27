@@ -3,11 +3,11 @@ use crate::upstream_auth::*;
 use anyhow::bail;
 use async_trait::async_trait;
 
-pub struct Form {
+pub struct Password {
     bcrypt_cost: u32,
 }
 
-impl Form {
+impl Password {
     fn new(bcrypt_cost: u32) -> Self {
         Self { bcrypt_cost }
     }
@@ -28,20 +28,24 @@ impl Form {
 }
 
 #[derive(View)]
-#[view(path = "views/components/form.rs.html")]
-struct FormView {
+#[view(path = "views/components/password.rs.html")]
+struct PasswordView {
     csrf_token: String,
     login_token: String,
 }
 
 #[async_trait]
-impl UpstreamAuthenticator for Form {
+impl UpstreamAuthenticator for Password {
+    fn id(&self) -> &str {
+        "password"
+    }
+
     fn name(&self) -> &str {
-        "form"
+        "Password"
     }
 
     async fn auth(&self, ctx: &Context) -> anyhow::Result<AuthorizeResponse> {
-        let form_view = FormView {
+        let form_view = PasswordView {
             csrf_token: ctx.csrf_token.clone(),
             login_token: ctx.login_session.internal_token.clone(),
         };
