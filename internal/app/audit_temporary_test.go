@@ -14,7 +14,7 @@ import (
 	"github.com/le0developer/guard/internal/security"
 )
 
-func TestAuditGroupDeletionOpensClient(t *testing.T) {
+func TestAuditGroupDeletionKeepsClientClosed(t *testing.T) {
 	a := testApp(t)
 	ctx := context.Background()
 	actor, err := a.Q.CreateUser(ctx, db.CreateUserParams{Username: "admin", Role: "Admin", WebauthnUserID: []byte{1}})
@@ -47,10 +47,16 @@ func TestAuditGroupDeletionOpensClient(t *testing.T) {
 		t.Fatal(err)
 	}
 	after, err := a.permitted(ctx, a.Q, c.ID, outsider.ID)
-	if err != nil || !after {
+	if err != nil || after {
 		t.Fatalf("after=%v err=%v", after, err)
 	}
-	t.Log("confirmed: outsider denied before group deletion, allowed afterward")
+	client, err := a.Q.GetClient(ctx, c.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !client.Disabled {
+		t.Fatal("client must be disabled when its last access rule is removed")
+	}
 }
 
 func TestAuditRevokedAdminCanPromoteAccomplice(t *testing.T) {
