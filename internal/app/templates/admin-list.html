@@ -69,6 +69,8 @@
               <td>
                 {{if eq .Kind "Oidc"}}
                   OpenID Connect
+                {{else if eq .Kind "Saml"}}
+                  SAML 2.0
                 {{else}}
                   Forward auth
                 {{end}}

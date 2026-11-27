@@ -504,6 +504,111 @@
                 "import": "github.com/le0developer/guard/internal/ids",
                 "type": "ClientID"
               }
+            },
+            {
+              "column": "saml_client_configs.client_id",
+              "go_type": {
+                "import": "github.com/le0developer/guard/internal/ids",
+                "type": "ClientID"
+              }
+            },
+            {
+              "column": "saml_acs_endpoints.id",
+              "go_type": {
+                "import": "github.com/le0developer/guard/internal/ids",
+                "type": "SAMLACSID"
+              }
+            },
+            {
+              "column": "saml_acs_endpoints.client_id",
+              "go_type": {
+                "import": "github.com/le0developer/guard/internal/ids",
+                "type": "ClientID"
+              }
+            },
+            {
+              "column": "saml_sp_certificates.id",
+              "go_type": {
+                "import": "github.com/le0developer/guard/internal/ids",
+                "type": "SAMLSPCertificateID"
+              }
+            },
+            {
+              "column": "saml_sp_certificates.client_id",
+              "go_type": {
+                "import": "github.com/le0developer/guard/internal/ids",
+                "type": "ClientID"
+              }
+            },
+            {
+              "column": "saml_signing_keys.id",
+              "go_type": {
+                "import": "github.com/le0developer/guard/internal/ids",
+                "type": "SAMLSigningKeyID"
+              }
+            },
+            {
+              "column": "saml_signing_keys.client_id",
+              "go_type": {
+                "import": "github.com/le0developer/guard/internal/ids",
+                "type": "ClientID"
+              }
+            },
+            {
+              "column": "saml_subjects.client_id",
+              "go_type": {
+                "import": "github.com/le0developer/guard/internal/ids",
+                "type": "ClientID"
+              }
+            },
+            {
+              "column": "saml_subjects.user_id",
+              "go_type": {
+                "import": "github.com/le0developer/guard/internal/ids",
+                "type": "UserID"
+              }
+            },
+            {
+              "column": "saml_requests.id",
+              "go_type": {
+                "import": "github.com/le0developer/guard/internal/ids",
+                "type": "SAMLRequestID"
+              }
+            },
+            {
+              "column": "saml_requests.client_id",
+              "go_type": {
+                "import": "github.com/le0developer/guard/internal/ids",
+                "type": "ClientID"
+              }
+            },
+            {
+              "column": "saml_sessions.id",
+              "go_type": {
+                "import": "github.com/le0developer/guard/internal/ids",
+                "type": "SAMLSessionID"
+              }
+            },
+            {
+              "column": "saml_sessions.client_id",
+              "go_type": {
+                "import": "github.com/le0developer/guard/internal/ids",
+                "type": "ClientID"
+              }
+            },
+            {
+              "column": "saml_sessions.session_id",
+              "go_type": {
+                "import": "github.com/le0developer/guard/internal/ids",
+                "type": "SessionID"
+              }
+            },
+            {
+              "column": "saml_authentications.session_id",
+              "go_type": {
+                "import": "github.com/le0developer/guard/internal/ids",
+                "type": "SessionID"
+              }
             }
           ]
         }

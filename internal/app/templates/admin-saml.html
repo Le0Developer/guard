@@ -1,0 +1,27 @@
+<p><a href="/admin/clients/{{.Data.Client.ID}}">Back to client</a></p>
+<p>SP-initiated SSO only. Guard logout does not terminate existing application sessions.</p>
+<label>Guard entity ID / metadata URL<input readonly value="{{.Data.Base}}/metadata"></label>
+<label>SSO URL<input readonly value="{{.Data.Base}}/sso"></label>
+<form method="post" action="{{.Data.Action}}">
+{{template "csrf" $}}
+<label>SP entity ID<input name="entity_id" value="{{.Data.Config.EntityID}}" maxlength="2048" required></label>
+<label>ACS endpoints<textarea name="acs" rows="5" required>{{.Data.ACS}}</textarea></label>
+<p>One per line: index followed by the exact HTTP-POST ACS URL.</p>
+<label>Default ACS index<input name="default_index" type="number" min="0" value="{{.Data.DefaultIndex}}" required></label>
+<label>NameID format<select name="name_id_format"><option value="urn:oasis:names:tc:SAML:2.0:nameid-format:persistent" {{if eq .Data.Config.NameIDFormat "urn:oasis:names:tc:SAML:2.0:nameid-format:persistent"}}selected{{end}}>Persistent</option><option value="urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress" {{if eq .Data.Config.NameIDFormat "urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress"}}selected{{end}}>Email address</option></select></label>
+<p>Email identifiers change when a user's email changes and can affect application account links.</p>
+<label><input type="checkbox" name="require_signature" {{if .Data.Config.RequireSignature}}checked{{end}}>Require signed AuthnRequests</label>
+<label>SP signing certificates (PEM)<textarea name="certificates" rows="6">{{.Data.Certificates}}</textarea></label>
+<fieldset><legend>Released attributes</legend><p>Leave a name blank to omit that attribute.</p>
+<label>Persistent identifier<input name="attribute_uid" value="{{index .Data.Mapping "uid"}}" maxlength="200"></label>
+<label>Username<input name="attribute_username" value="{{index .Data.Mapping "username"}}" maxlength="200"></label>
+<label>Email<input name="attribute_email" value="{{index .Data.Mapping "email"}}" maxlength="200"></label>
+<label>Groups<input name="attribute_groups" value="{{index .Data.Mapping "groups"}}" maxlength="200"></label></fieldset>
+<label>Application login URL (optional)<input name="launch_url" type="url" value="{{.Data.Config.LaunchUrl}}" maxlength="2048"></label>
+<label>Certificate publication overlap (seconds)<input name="key_overlap_s" type="number" min="180" max="2678400" value="{{.Data.Config.KeyOverlapS}}" required></label>
+<button>Save SAML configuration</button></form>
+<h2>Signing certificates</h2>
+{{range .Data.Keys}}<p>{{.State}}: expires {{.Expires}} {{if .Warning}}<strong>Expires within 30 days or has expired.</strong>{{end}}</p><p>SHA-256: {{.Fingerprint}}</p><p><a href="{{$.Data.Action}}/certificates/{{.ID}}">Download certificate</a></p>{{end}}
+<form method="post" action="{{.Data.Action}}/keys/prepare">{{template "csrf" $}}<button>Prepare next signing certificate</button></form>
+<p>Import the next certificate into your service provider before activating it. Both certificates appear in metadata. Retired public certificates remain published for the configured overlap.</p>
+<form method="post" action="{{.Data.Action}}/keys/activate">{{template "csrf" $}}<label><input type="checkbox" name="confirm" value="activate" required>The service provider trusts the next certificate.</label><button>Activate next signing certificate</button></form>

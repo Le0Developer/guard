@@ -214,6 +214,75 @@ type RecoveryCode struct {
 	CreatedAt time.Time          `json:"created_at"`
 }
 
+type SamlAcsEndpoint struct {
+	ID            ids.SAMLACSID `json:"id"`
+	ClientID      ids.ClientID  `json:"client_id"`
+	EndpointIndex int32         `json:"endpoint_index"`
+	Url           string        `json:"url"`
+	IsDefault     bool          `json:"is_default"`
+}
+
+type SamlAuthentication struct {
+	SessionID   ids.SessionID `json:"session_id"`
+	RequestHash string        `json:"request_hash"`
+}
+
+type SamlClientConfig struct {
+	ClientID         ids.ClientID `json:"client_id"`
+	Revision         int64        `json:"revision"`
+	EntityID         string       `json:"entity_id"`
+	NameIDFormat     string       `json:"name_id_format"`
+	RequireSignature bool         `json:"require_signature"`
+	Attributes       []byte       `json:"attributes"`
+	LaunchUrl        string       `json:"launch_url"`
+	KeyOverlapS      int32        `json:"key_overlap_s"`
+}
+
+type SamlRequest struct {
+	ID          ids.SAMLRequestID `json:"id"`
+	ClientID    ids.ClientID      `json:"client_id"`
+	RequestID   string            `json:"request_id"`
+	TokenHash   string            `json:"token_hash"`
+	BrowserHash string            `json:"browser_hash"`
+	Revision    int64             `json:"revision"`
+	Request     []byte            `json:"request"`
+	ExpiresAt   time.Time         `json:"expires_at"`
+	ConsumedAt  *time.Time        `json:"consumed_at"`
+	CreatedAt   time.Time         `json:"created_at"`
+}
+
+type SamlSession struct {
+	ID           ids.SAMLSessionID `json:"id"`
+	ClientID     ids.ClientID      `json:"client_id"`
+	SessionID    ids.SessionID     `json:"session_id"`
+	SessionIndex string            `json:"session_index"`
+}
+
+type SamlSigningKey struct {
+	ID          ids.SAMLSigningKeyID `json:"id"`
+	ClientID    ids.ClientID         `json:"client_id"`
+	KeyRef      string               `json:"key_ref"`
+	PrivateKey  string               `json:"private_key"`
+	Certificate []byte               `json:"certificate"`
+	State       string               `json:"state"`
+	ExpiresAt   time.Time            `json:"expires_at"`
+	RetireAt    *time.Time           `json:"retire_at"`
+	RetiredAt   *time.Time           `json:"retired_at"`
+	CreatedAt   time.Time            `json:"created_at"`
+}
+
+type SamlSpCertificate struct {
+	ID          ids.SAMLSPCertificateID `json:"id"`
+	ClientID    ids.ClientID            `json:"client_id"`
+	Certificate []byte                  `json:"certificate"`
+}
+
+type SamlSubject struct {
+	ClientID ids.ClientID `json:"client_id"`
+	UserID   ids.UserID   `json:"user_id"`
+	Subject  string       `json:"subject"`
+}
+
 type ScimConfig struct {
 	ClientID      ids.ClientID `json:"client_id"`
 	Endpoint      string       `json:"endpoint"`

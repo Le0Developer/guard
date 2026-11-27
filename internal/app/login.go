@@ -106,6 +106,14 @@ func (a *App) login(w http.ResponseWriter, r *http.Request) {
 		state.ProviderID = selected.ID
 		state.Revision = selected.Revision
 	}
+	if state.ForceLogin {
+		hash, e := a.samlLoginBinding(r)
+		if e != nil {
+			a.adminResult(w, r, e)
+			return
+		}
+		state.SAMLRequestHash = hash
+	}
 	encoded, err := json.Marshal(state)
 	if err != nil {
 		a.serverError(w, r, err)
@@ -278,6 +286,15 @@ func (a *App) finishLogin(w http.ResponseWriter, r *http.Request, user db.User, 
 		issued, err := q.CreateSession(r.Context(), db.CreateSessionParams{UserID: user.ID, TokenHash: security.Hash(raw), ExpiresAt: time.Now().Add(SessionLifetime)})
 		if err != nil {
 			return err
+		}
+		var loginState upstreamLoginState
+		if err = json.Unmarshal(locked.State, &loginState); err != nil {
+			return err
+		}
+		if loginState.SAMLRequestHash != "" {
+			if err = q.RecordSAMLAuthentication(r.Context(), db.RecordSAMLAuthenticationParams{SessionID: issued.ID, RequestHash: loginState.SAMLRequestHash}); err != nil {
+				return err
+			}
 		}
 		if binding != nil {
 			var state upstreamLoginState

@@ -23,3 +23,9 @@ type OIDCSessionID int64
 type LogoutDeliveryID int64
 
 type UpstreamProviderID int64
+
+type SAMLACSID int64
+type SAMLSPCertificateID int64
+type SAMLSigningKeyID int64
+type SAMLRequestID int64
+type SAMLSessionID int64

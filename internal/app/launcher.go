@@ -33,6 +33,14 @@ func (a *App) launcherApps(r *http.Request, user ids.UserID) ([]launcherApp, err
 			return nil, err
 		}
 		launchURL := ""
+		if client.ClientType == "Saml" {
+			cfg, e := a.Q.GetSAMLConfig(r.Context(), client.ID)
+			if e != nil && !notFound(e) {
+				return nil, e
+			}
+			apps = append(apps, launcherApp{Name: client.Name, URL: cfg.LaunchUrl})
+			continue
+		}
 		if len(redirects) > 0 {
 			// OIDC callback paths are not app entry points. Launch the first URI's origin.
 			if parsed, err := security.URL(redirects[0].RedirectUri); err == nil {

@@ -22,12 +22,12 @@ func (a *App) adminWriteClient(w http.ResponseWriter, r *http.Request, actor *id
 	if err = adminRequired(name, "Client name", 200); err != nil {
 		return err
 	}
-	if kind != "Oidc" && kind != "ForwardAuth" {
-		return adminInvalid("Choose OpenID Connect or Forward auth.")
+	if kind != "Oidc" && kind != "ForwardAuth" && kind != "Saml" {
+		return adminInvalid("Choose OpenID Connect, Forward auth or SAML.")
 	}
 	logoutURI := r.PostForm.Get("backchannel_logout_uri")
 	logoutRequired := r.PostForm.Has("backchannel_logout_session_required")
-	if kind == "ForwardAuth" {
+	if kind != "Oidc" {
 		logoutURI, logoutRequired = "", false
 	} else if err := validateLogoutURI(logoutURI); err != nil {
 		return adminInvalid(err.Error())
@@ -47,6 +47,9 @@ func (a *App) adminWriteClient(w http.ResponseWriter, r *http.Request, actor *id
 			}
 			old = map[string]bool{"detailed_logging": c.DetailedLogging, "allow_event_reports": c.AllowEventReports}
 			if c.ClientType != kind {
+				if c.ClientType == "Saml" || kind == "Saml" {
+					return adminInvalid("Create a new client when switching into or out of SAML.")
+				}
 				redirects, e := q.ClientRedirectsByClientId(r.Context(), id)
 				if e != nil {
 					return e
@@ -62,16 +65,16 @@ func (a *App) adminWriteClient(w http.ResponseWriter, r *http.Request, actor *id
 			}
 		}
 		if id == 0 {
-			c, e = q.CreateClient(r.Context(), db.CreateClientParams{Name: name, Slug: security.Token(), ClientID: security.Token(), ClientSecret: security.Token(), ClientType: kind, SessionLifetimeS: int32(lifetime), RequirePkce: r.PostForm.Has("require_pkce"), DetailedLogging: r.PostForm.Has("detailed_logging"), AllowEventReports: r.PostForm.Has("allow_event_reports"), DeletedAt: nil})
+			c, e = q.CreateClient(r.Context(), db.CreateClientParams{Name: name, Slug: security.Token(), ClientID: security.Token(), ClientSecret: security.Token(), ClientType: kind, SessionLifetimeS: int32(lifetime), RequirePkce: kind != "Saml" && r.PostForm.Has("require_pkce"), DetailedLogging: r.PostForm.Has("detailed_logging"), AllowEventReports: kind != "Saml" && r.PostForm.Has("allow_event_reports"), DeletedAt: nil})
 			id = c.ID
 		} else {
 			p := adminClientParams(c)
 			p.Name = name
 			p.ClientType = kind
 			p.SessionLifetimeS = int32(lifetime)
-			p.RequirePkce = r.PostForm.Has("require_pkce")
+			p.RequirePkce = kind != "Saml" && r.PostForm.Has("require_pkce")
 			p.DetailedLogging = r.PostForm.Has("detailed_logging")
-			p.AllowEventReports = r.PostForm.Has("allow_event_reports")
+			p.AllowEventReports = kind != "Saml" && r.PostForm.Has("allow_event_reports")
 			c, e = q.UpdateClient(r.Context(), p)
 		}
 		if e != nil {
@@ -111,6 +114,9 @@ func (a *App) adminClientAction(w http.ResponseWriter, r *http.Request, actor *i
 		c, e := adminClient(ctx, q, id, true)
 		if e != nil {
 			return e
+		}
+		if c.ClientType == "Saml" && !strings.Contains(r.URL.Path, "/rules") {
+			return adminInvalid("Use SAML configuration to manage this application.")
 		}
 		if strings.HasSuffix(r.URL.Path, "/rotate-secret") {
 			if r.PostForm.Get("confirm") != "rotate" {

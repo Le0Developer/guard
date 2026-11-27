@@ -16,13 +16,14 @@ import (
 var errUpstreamSessionChanged = errors.New("upstream sign-in is no longer valid")
 
 type upstreamLoginState struct {
-	Exchanged  bool                   `json:"exchanged"`
-	Nonce      string                 `json:"nonce"`
-	ProviderID ids.UpstreamProviderID `json:"provider_id"`
-	Revision   int64                  `json:"revision"`
-	ForceLogin bool                   `json:"force_login,omitempty"`
-	MaxAge     *uint64                `json:"max_age,omitempty"`
-	AuthTime   int64                  `json:"auth_time,omitempty"`
+	SAMLRequestHash string                 `json:"saml_request_hash,omitempty"`
+	Exchanged       bool                   `json:"exchanged"`
+	Nonce           string                 `json:"nonce"`
+	ProviderID      ids.UpstreamProviderID `json:"provider_id"`
+	Revision        int64                  `json:"revision"`
+	ForceLogin      bool                   `json:"force_login,omitempty"`
+	MaxAge          *uint64                `json:"max_age,omitempty"`
+	AuthTime        int64                  `json:"auth_time,omitempty"`
 }
 
 func (a *App) provider(ctx context.Context, slug string) (db.UpstreamProvider, error) {

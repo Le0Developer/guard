@@ -181,6 +181,43 @@ For Caddy or Traefik, call `/` and propagate redirects. For Nginx `auth_request`
 call `/auth_request` and convert a 401 with `Location` into an external 303,
 retaining the first `Set-Cookie` header. Apply that adapter to the callback too.
 
+### SAML 2.0
+
+Create a SAML 2.0 client, save it, then open **Configure SAML service provider**.
+Enter the exact SP entity ID and HTTP-POST ACS URLs, one per line as `index URL`,
+and choose the default index. Register the displayed Guard metadata URL (also
+its IdP entity ID) and SSO URL with your application. Use HTTPS except loopback.
+
+Only SP-initiated HTTP-Redirect requests and HTTP-POST responses are supported.
+Both response and assertion are RSA-SHA256 signed. Existing login providers, MFA
+and client group rules apply. For first use of a persistent NameID, the SP must
+send `NameIDPolicy AllowCreate="true"`. Email NameID requires a valid email
+belonging to exactly one active account; changing it can change the application's
+account association. Attribute release is opt-in: name the username, email,
+persistent identifier and groups attributes you need; leave others blank.
+
+To require signed requests, enable that option and paste the SP's RSA signing
+certificate(s). Supplied signatures are always verified. ForceAuthn requires a
+new login bound to that request; OAuth2-only providers cannot prove freshness.
+IsPassive never prompts. AuthnInstant records completion of the original Guard
+login, including local MFA, rather than claiming an upstream authentication time.
+Unsupported authentication-context requirements return an error.
+
+Assertions expire after two minutes, capped by Guard session expiry. Application
+session deadlines are also bounded by the client lifetime; the SP must enforce
+them. Guard logout, account disable and group changes block future SSO but cannot
+terminate an existing application session: SAML Single Logout is not supported.
+There are no unsolicited responses, encrypted assertions or upstream SAML login.
+The optional application login URL lets the launcher start SSO through the SP.
+
+Each client gets an encrypted signing key and one-year certificate. Back up the
+database together with `MFA_ENCRYPTION_KEY`. Prepare the next certificate, import
+it into the SP or refresh its trusted metadata, then confirm activation in Guard.
+Retired public certificates remain published for the configured overlap (seven
+days by default); retired private material is erased after three minutes. Expired
+active certificates block issuance. Configuration changes invalidate pending
+requests. If delivery fails after issuance, start a new request from the SP.
+
 ### SCIM provisioning
 
 For a saved OIDC client, open **Configure SCIM provisioning**. Enter the target

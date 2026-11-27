@@ -75,3 +75,6 @@ var adminSCIMTemplate string
 
 //go:embed templates/userinfo-simulator.html
 var userinfoSimulatorTemplate string
+
+//go:embed templates/admin-saml.html
+var adminSAMLTemplate string
