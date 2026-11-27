@@ -1,0 +1,28 @@
+{{define "admin-nav"}}
+  <nav aria-label="Administration">
+    <ul class="pagination admin-nav">
+      <li>
+        <a href="/admin" class="c-info {{if eq .AdminSection "overview"}}active{{end}}" aria-current="{{if eq .AdminSection "overview"}}page{{else}}false{{end}}">Overview</a>
+      </li>
+      <li>
+        <a href="/admin/users" class="c-info {{if eq .AdminSection "users"}}active{{end}}" aria-current="{{if eq .AdminSection "users"}}page{{else}}false{{end}}">Users</a>
+      </li>
+      <li>
+        <a href="/admin/groups" class="c-info {{if eq .AdminSection "groups"}}active{{end}}" aria-current="{{if eq .AdminSection "groups"}}page{{else}}false{{end}}">Groups</a>
+      </li>
+      <li>
+        <a href="/admin/clients" class="c-info {{if eq .AdminSection "clients"}}active{{end}}" aria-current="{{if eq .AdminSection "clients"}}page{{else}}false{{end}}">Clients</a>
+      </li>
+      <li>
+        <a href="/admin/providers" class="c-info {{if eq .AdminSection "providers"}}active{{end}}" aria-current="{{if eq .AdminSection "providers"}}page{{else}}false{{end}}">Login providers</a>
+      </li>
+      <li>
+        <a href="/admin/audit" class="c-info {{if eq .AdminSection "audit"}}active{{end}}" aria-current="{{if eq .AdminSection "audit"}}page{{else}}false{{end}}">Audit log</a>
+      </li>
+      <li>
+        <a href="/admin/access-log" class="c-info {{if eq .AdminSection "access-log"}}active{{end}}" aria-current="{{if eq .AdminSection "access-log"}}page{{else}}false{{end}}">Access journal</a>
+      </li>
+    </ul>
+  </nav>
+  <hr>
+{{end}}

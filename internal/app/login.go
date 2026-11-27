@@ -135,7 +135,7 @@ func (a *App) login(w http.ResponseWriter, r *http.Request) {
 	if !a.Config.PasswordDisabled {
 		choices = append(choices, choice{"password", "Password"})
 	}
-	a.page(w, r, "Sign in", `<p>Choose a sign-in method.</p>{{range .Data.Choices}}<p><a role="button" class="btn btn-secondary btn-outline" href="/login/{{.ID}}?r={{$.Data.Redirect}}">Continue with {{.Name}}</a></p>{{else}}<p>No login methods are configured.</p>{{end}}`, map[string]any{"Choices": choices, "Redirect": login.RedirectUri})
+	a.page(w, r, "Sign in", loginChoicesTemplate, map[string]any{"Choices": choices, "Redirect": login.RedirectUri})
 }
 func (a *App) passwordPage(w http.ResponseWriter, r *http.Request, login db.LoginSession, message string) {
 	a.page(w, r, "Sign in", passwordTemplate, map[string]any{"Login": login, "Error": message})

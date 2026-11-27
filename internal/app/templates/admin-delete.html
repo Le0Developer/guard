@@ -1,0 +1,11 @@
+<p>
+  Delete
+  <strong>{{.Data.Name}}</strong>
+  ?
+</p>
+<p>Access and related memberships or client credentials will be removed. The record is retained for audit history.</p>
+<form method="post">
+  {{template "csrf" $}}
+  <button class="btn btn-error">Confirm deletion</button>
+  <a class="c-info" href="/admin/{{.Data.Section}}/{{.Data.ID}}">Cancel</a>
+</form>

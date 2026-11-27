@@ -1,0 +1,10 @@
+<p>Save these codes now. Each can be used once.</p>
+<ul data-backup-codes>
+  {{range .Data.Codes}}
+    <li>
+      <code>{{.}}</code>
+    </li>
+  {{end}}
+</ul>
+<button type="button" class="btn btn-info" data-download-codes>Download codes</button>
+<a role="button" class="btn btn-secondary btn-outline" href="{{.Data.Base}}">Done</a>

@@ -1,0 +1,5 @@
+<p>Delete {{.Data.Name}}? This revokes provider sessions and pending logins.</p>
+<form method="post">
+  {{template "csrf" $}}
+  <button class="btn btn-error">Delete provider</button>
+</form>

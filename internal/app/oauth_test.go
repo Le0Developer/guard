@@ -48,11 +48,13 @@ func TestOAuthPKCEVectors(t *testing.T) {
 }
 func TestOAuthClaimsScope(t *testing.T) {
 	u := db.User{ID: ids.UserID(42), Username: "alice", Email: "alice@example.com"}
-	v := oauthIdentity(u, "openid")
-	if len(v) != 1 || v["sub"] != "42" {
+	a := &App{}
+	c := db.Client{ID: 7, ClientID: "matrix"}
+	v := a.oauthIdentity(c, u, "openid")
+	if len(v) != 1 || v["sub"] != a.oidcSubject(c, u.ID) {
 		t.Fatalf("claims leaked: %v", v)
 	}
-	v = oauthIdentity(u, "profile email")
+	v = a.oauthIdentity(c, u, "profile email")
 	if v["username"] != u.Username || v["preferred_username"] != u.Username || v["name"] != "alice" || v["email"] != u.Email {
 		t.Fatalf("claims missing %v", v)
 	}
@@ -69,5 +71,28 @@ func TestOAuthRejectsMixedClientAuthentication(t *testing.T) {
 		if _, e := a.oauthAuthenticate(r.Context(), nil, r, tc.form); e == nil {
 			t.Fatal("accepted ambiguous authentication")
 		}
+	}
+}
+
+func TestOIDCSubjectPerClientAndStable(t *testing.T) {
+	a := &App{}
+	c := db.Client{ID: 7, ClientID: "matrix", ClientSecret: "old"}
+	subject := a.oidcSubject(c, 42)
+	if subject == "42" || len(subject) != 43 {
+		t.Fatalf("subject is not opaque: %q", subject)
+	}
+	restarted := &App{}
+	c.ClientSecret = "rotated"
+	c.Name, c.Slug = "Renamed", "renamed"
+	if restarted.oidcSubject(c, 42) != subject {
+		t.Fatal("subject changed after restart or mutable client changes")
+	}
+	other := c
+	other.ID, other.ClientID = 8, "other"
+	if a.oidcSubject(other, 42) == subject {
+		t.Fatal("subject shared across clients")
+	}
+	if a.oidcSubject(c, 43) == subject {
+		t.Fatal("subject shared across users")
 	}
 }

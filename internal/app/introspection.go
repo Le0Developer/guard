@@ -3,7 +3,6 @@ package app
 import (
 	"context"
 	"errors"
-	"fmt"
 	"mime"
 	"net/http"
 	"time"
@@ -99,7 +98,7 @@ func (a *App) oauthIntrospect(w http.ResponseWriter, r *http.Request) {
 		if access && token.AccessExpiresAt.Before(expiry) {
 			expiry = token.AccessExpiresAt
 		}
-		out = map[string]any{"active": true, "client_id": c.ClientID, "sub": fmt.Sprint(v.User.ID), "username": v.User.Username, "scope": token.Scope, "exp": expiry.Unix(), "iat": token.CreatedAt.Unix(), "iss": a.oauthIssuer(c)}
+		out = map[string]any{"active": true, "client_id": c.ClientID, "sub": a.oidcSubject(c, v.User.ID), "username": v.User.Username, "scope": token.Scope, "exp": expiry.Unix(), "iat": token.CreatedAt.Unix(), "iss": a.oauthIssuer(c)}
 		if access {
 			out["token_type"] = "Bearer"
 		}

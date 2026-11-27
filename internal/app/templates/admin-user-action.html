@@ -1,0 +1,28 @@
+<p>
+  Account:
+  <strong>{{.Data.Target.Username}}</strong>
+</p>
+<form method="post">
+  {{template "csrf" $}}
+  {{if eq .Data.Action "password"}}
+    <p>This changes the password and revokes all sessions.</p>
+    <label for="password">New password</label>
+    <input id="password" name="password" type="password" minlength="8" maxlength="72" autocomplete="new-password" required>
+    <label for="confirm_password">Confirm password</label>
+    <input id="confirm_password" name="confirm_password" type="password" autocomplete="new-password" required>
+  {{else}}
+    <p>Current role: {{.Data.Target.Role}}. Changing this role revokes all sessions.</p>
+    <input type="hidden" name="current_role" value="{{.Data.Target.Role}}">
+    <input type="hidden" name="role" value="{{if eq .Data.Target.Role "Admin"}}User{{else}}Admin{{end}}">
+    <p>
+      {{if eq .Data.Target.Role "Admin"}}
+        Remove
+      {{else}}
+        Grant
+      {{end}}
+      administrator access?
+    </p>
+  {{end}}
+  <button class="btn btn-warning">Confirm change</button>
+  <a class="c-info" href="/admin/users/{{.Data.Target.ID}}">Cancel</a>
+</form>

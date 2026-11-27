@@ -3,6 +3,7 @@ package app
 import (
 	"context"
 	"crypto"
+	"crypto/hmac"
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/sha256"
@@ -170,7 +171,7 @@ func (a *App) oauthDiscovery(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	b := strings.TrimRight(a.Config.Domain, "/") + "/oauth2"
-	jsonResponse(w, 200, map[string]any{"issuer": a.oauthIssuer(c), "authorization_endpoint": b + "/authorize", "token_endpoint": b + "/token", "userinfo_endpoint": b + "/userinfo", "revocation_endpoint": b + "/revoke", "event_endpoint": b + "/event", "response_modes_supported": []string{"query"}, "revocation_endpoint_auth_methods_supported": []string{"client_secret_basic", "client_secret_post"}, "request_parameter_supported": false, "request_uri_parameter_supported": false, "introspection_endpoint": b + "/introspect", "introspection_endpoint_auth_methods_supported": []string{"client_secret_basic", "client_secret_post"}, "backchannel_logout_supported": true, "backchannel_logout_session_supported": true, "claims_supported": []string{"sid", "iss", "sub", "aud", "iat", "exp", "auth_time", "nonce", "name", "username", "preferred_username", "email", "groups"}, "jwks_uri": a.oauthIssuer(c) + "/jwks", "response_types_supported": []string{"code"}, "grant_types_supported": []string{"authorization_code", "refresh_token"}, "subject_types_supported": []string{"public"}, "id_token_signing_alg_values_supported": []string{"RS256"}, "token_endpoint_auth_methods_supported": []string{"client_secret_basic", "client_secret_post"}, "code_challenge_methods_supported": []string{"plain", "S256"}, "scopes_supported": []string{"openid", "profile", "email", "groups"}})
+	jsonResponse(w, 200, map[string]any{"issuer": a.oauthIssuer(c), "authorization_endpoint": b + "/authorize", "token_endpoint": b + "/token", "userinfo_endpoint": b + "/userinfo", "revocation_endpoint": b + "/revoke", "event_endpoint": b + "/event", "response_modes_supported": []string{"query"}, "revocation_endpoint_auth_methods_supported": []string{"client_secret_basic", "client_secret_post"}, "request_parameter_supported": false, "request_uri_parameter_supported": false, "introspection_endpoint": b + "/introspect", "introspection_endpoint_auth_methods_supported": []string{"client_secret_basic", "client_secret_post"}, "backchannel_logout_supported": true, "backchannel_logout_session_supported": true, "claims_supported": []string{"sid", "iss", "sub", "aud", "iat", "exp", "auth_time", "nonce", "name", "username", "preferred_username", "email", "groups"}, "jwks_uri": a.oauthIssuer(c) + "/jwks", "response_types_supported": []string{"code"}, "grant_types_supported": []string{"authorization_code", "refresh_token"}, "subject_types_supported": []string{"pairwise"}, "id_token_signing_alg_values_supported": []string{"RS256"}, "token_endpoint_auth_methods_supported": []string{"client_secret_basic", "client_secret_post"}, "code_challenge_methods_supported": []string{"plain", "S256"}, "scopes_supported": []string{"openid", "profile", "email", "groups"}})
 }
 func (a *App) oauthKey(ctx context.Context, q *db.Queries, c db.Client) (db.SigningKey, *rsa.PrivateKey, error) {
 	ks, e := q.SigningKeysByClientId(ctx, c.ID)
@@ -442,8 +443,16 @@ func (a *App) oauthAuthenticate(ctx context.Context, q *db.Queries, r *http.Requ
 	}
 	return c, nil
 }
-func oauthIdentity(u db.User, scope string) map[string]any {
-	v := map[string]any{"sub": fmt.Sprint(u.ID)}
+
+// oidcSubject derives a stable per-client subject without additional stored state.
+func (a *App) oidcSubject(c db.Client, userID ids.UserID) string {
+	mac := hmac.New(sha256.New, []byte(fmt.Sprint(userID)))
+	mac.Write([]byte(c.ClientID))
+	return base64.RawURLEncoding.EncodeToString(mac.Sum(nil))
+}
+
+func (a *App) oauthIdentity(c db.Client, u db.User, scope string) map[string]any {
+	v := map[string]any{"sub": a.oidcSubject(c, u.ID)}
 	for _, s := range strings.Fields(scope) {
 		if s == "profile" {
 			v["username"] = u.Username
@@ -458,8 +467,8 @@ func oauthIdentity(u db.User, scope string) map[string]any {
 }
 
 // Resolve scope-gated group memberships at issuance and on every UserInfo request.
-func oauthIdentityClaims(ctx context.Context, q *db.Queries, u db.User, scope string) (map[string]any, error) {
-	claims := oauthIdentity(u, scope)
+func (a *App) oauthIdentityClaims(ctx context.Context, q *db.Queries, c db.Client, u db.User, scope string) (map[string]any, error) {
+	claims := a.oauthIdentity(c, u, scope)
 	for _, s := range strings.Fields(scope) {
 		if s == "groups" {
 			names, err := q.ActiveGroupNamesForUser(ctx, u.ID)
@@ -495,7 +504,7 @@ func (a *App) oauthMint(ctx context.Context, q *db.Queries, c db.Client, v *iden
 		if e != nil {
 			return nil, e
 		}
-		claims, e := oauthIdentityClaims(ctx, q, v.User, t.Scope)
+		claims, e := a.oauthIdentityClaims(ctx, q, c, v.User, t.Scope)
 		if e != nil {
 			return nil, e
 		}
@@ -718,7 +727,7 @@ func (a *App) oauthUserinfo(w http.ResponseWriter, r *http.Request) {
 		jsonResponse(w, 403, map[string]string{"error": "insufficient_scope"})
 		return
 	}
-	claims, e := oauthIdentityClaims(r.Context(), a.Q, v.User, t.Scope)
+	claims, e := a.oauthIdentityClaims(r.Context(), a.Q, c, v.User, t.Scope)
 	if e != nil {
 		a.oauthServerError(w, r, e)
 		return

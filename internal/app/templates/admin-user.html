@@ -1,0 +1,81 @@
+<p>
+  <a class="c-info" href="/admin/users">Back to users</a>
+</p>
+<form method="post" action="{{.Data.Action}}">
+  {{template "csrf" $}}
+  <label for="username">Username</label>
+  <input id="username" name="username" value="{{.Data.Target.Username}}" maxlength="128" required>
+  <label for="email">Email</label>
+  <input id="email" name="email" type="email" value="{{.Data.Target.Email}}" maxlength="254">
+  {{if .Data.New}}
+    <label for="role">Role</label>
+    <select id="role" name="role">
+      <option>User</option>
+      <option>Admin</option>
+    </select>
+    <label for="password">Password (optional)</label>
+    <input id="password" name="password" type="password" minlength="8" maxlength="72" autocomplete="new-password">
+  {{end}}
+  <label>
+    <input name="disabled" type="checkbox" {{if .Data.Target.Disabled}}checked{{end}}>
+    Disable this account
+  </label>
+  <button class="btn btn-info">Save details</button>
+</form>
+{{if not .Data.New}}
+  <hr>
+  <h2>Security</h2>
+  <p>Current role: {{.Data.Target.Role}}</p>
+  {{if ne .User.ID .Data.Target.ID}}
+    <p>
+      <a class="c-info" href="/admin/users/{{.Data.Target.ID}}/role">Change administrator access</a>
+    </p>
+  {{end}}
+  <p>
+    <a class="c-info" href="/admin/users/{{.Data.Target.ID}}/password">Reset password</a>
+  </p>
+  <p>
+    <a class="c-info" href="/admin/users/{{.Data.Target.ID}}/security">Manage authenticators and backup codes</a>
+  </p>
+  <h2>Sessions</h2>
+  <div class="overflow-auto">
+    <table class="table-striped">
+      <thead>
+        <tr>
+          <th>Session</th>
+          <th>Created</th>
+          <th>Expires</th>
+          <th>Action</th>
+        </tr>
+      </thead>
+      <tbody>
+        {{range .Data.Sessions}}
+          <tr>
+            <td>{{.ID}}</td>
+            <td>{{.CreatedAt}}</td>
+            <td>{{.ExpiresAt}}</td>
+            <td>
+              <form method="post" action="/admin/users/{{$.Data.Target.ID}}/sessions/{{.ID}}/delete">
+                {{template "csrf" $}}
+                <button class="btn btn-error btn-outline">Revoke session</button>
+              </form>
+            </td>
+          </tr>
+        {{else}}
+          <tr>
+            <td colspan="4">No active sessions.</td>
+          </tr>
+        {{end}}
+      </tbody>
+    </table>
+  </div>
+  <form method="post" action="/admin/users/{{.Data.Target.ID}}/sessions/delete">
+    {{template "csrf" $}}
+    <button class="btn btn-error">Revoke all sessions</button>
+  </form>
+  {{if ne .User.ID .Data.Target.ID}}
+    <p>
+      <a class="btn btn-error btn-outline" href="/admin/users/{{.Data.Target.ID}}/delete">Delete user</a>
+    </p>
+  {{end}}
+{{end}}

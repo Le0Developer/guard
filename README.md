@@ -194,6 +194,14 @@ revokes the corresponding token family. Client rules apply to every grant and
 session check. Clients without rules allow all active signed-in users. Lower
 priority rules win; deny wins ties; unmatched users are denied when rules exist.
 
+OIDC subjects (`sub`) are opaque, stable per-client identifiers derived using
+HMAC-SHA256 with the user ID as the key and OAuth client ID as the message. They
+survive restarts, username changes, client secret rotation, and signing key
+rotation. Upgrading from numeric subjects changes existing account identities:
+reassociate accounts in downstream applications before relying on existing links.
+The `profile` scope includes the stored username as `username`,
+`preferred_username`, and `name`.
+
 Downstream OIDC apps can request `openid`, `profile`, `email`, and `groups`.
 The `groups` scope adds a `groups` array of active group names to ID tokens and
 UserInfo, sorted by name. No memberships produces `[]`; omitting the scope omits

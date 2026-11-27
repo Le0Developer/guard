@@ -46,7 +46,7 @@ func (a *App) adminProviders(w http.ResponseWriter, r *http.Request, _ *identity
 		}
 		rows = append(rows, adminRow{ID: fmt.Sprint(p.ID), Name: p.Name, Detail: detail})
 	}
-	a.page(w, r, "Upstream providers", `<p><a class="btn btn-info" role="button" href="/admin/providers/new">Add provider</a></p><div class="overflow-auto"><table class="table-striped table-hover"><tr><th>Name</th><th>Issuer</th></tr>{{range .Data}}<tr><td><a href="/admin/providers/{{.ID}}">{{.Name}}</a></td><td>{{.Detail}}</td></tr>{{else}}<tr><td>No providers configured.</td></tr>{{end}}</table></div>`, rows)
+	a.page(w, r, "Upstream providers", adminUpstreamListTemplate, rows)
 	return nil
 }
 func (a *App) adminProviderGet(r *http.Request) (db.UpstreamProvider, error) {
@@ -213,7 +213,7 @@ func (a *App) adminProviderDeleteForm(w http.ResponseWriter, r *http.Request, _ 
 	if err != nil {
 		return err
 	}
-	a.page(w, r, "Delete provider", `<p>Delete {{.Data.Name}}? This revokes provider sessions and pending logins.</p><form method="post">`+adminCSRF+`<button class="btn btn-error">Delete provider</button></form>`, adminRow{Name: p.Name})
+	a.page(w, r, "Delete provider", adminUpstreamDeleteTemplate, adminRow{Name: p.Name})
 	return nil
 }
 func (a *App) adminProviderDelete(w http.ResponseWriter, r *http.Request, actor *identity) error {

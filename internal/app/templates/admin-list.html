@@ -1,0 +1,94 @@
+<p>
+  <a class="btn btn-info" href="/admin/{{.Data.Section}}/new" role="button">
+    Create {{if eq .Data.Section "users"}}user{{else if eq .Data.Section "groups"}}group{{else}}client{{end}}
+  </a>
+</p>
+<form method="get" action="/admin/{{.Data.Section}}" role="search">
+  <fieldset role="group">
+    <input aria-label="Find {{.Data.Section}}" id="directory-search" type="search" name="q" value="{{.Data.Query}}" placeholder="Find {{.Data.Section}}">
+    <button type="submit" class="btn btn-secondary">Search</button>
+  </fieldset>
+</form>
+{{if .Data.Rows}}
+  <div class="overflow-auto" tabindex="0" role="region" aria-label="{{.Title}} directory">
+    <table class="table-striped table-hover">
+      <caption>{{len .Data.Rows}} {{.Data.Section}}</caption>
+      <thead>
+        <tr>
+          <th scope="col">
+            {{if eq .Data.Section "users"}}
+              Username
+            {{else if eq .Data.Section "groups"}}
+              Group
+            {{else}}
+              Name
+            {{end}}
+          </th>
+          {{if eq .Data.Section "users"}}
+            <th scope="col">Role</th>
+            <th scope="col">Status</th>
+            <th scope="col">Password login</th>
+          {{else if eq .Data.Section "groups"}}
+            <th scope="col">Members</th>
+          {{else}}
+            <th scope="col">Client ID</th>
+            <th scope="col">Type</th>
+            <th scope="col">Group rules</th>
+          {{end}}
+          <th scope="col">Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {{range .Data.Rows}}
+          <tr>
+            <th scope="row">
+              <a class="c-info" href="/admin/{{$.Data.Section}}/{{.ID}}">{{.Name}}</a>
+            </th>
+            {{if eq $.Data.Section "users"}}
+              <td>{{.Role}}</td>
+              <td>
+                {{if .Disabled}}
+                  <span class="badge badge-warning">Disabled</span>
+                {{else}}
+                  <span class="badge badge-success">Active</span>
+                {{end}}
+              </td>
+              <td>
+                {{if .LocalPassword}}
+                  Enabled
+                {{else}}
+                  Not set
+                {{end}}
+              </td>
+            {{else if eq $.Data.Section "groups"}}
+              <td>{{.Count}}</td>
+            {{else}}
+              <td>
+                <code>{{.Identifier}}</code>
+              </td>
+              <td>
+                {{if eq .Kind "Oidc"}}
+                  OpenID Connect
+                {{else}}
+                  Forward auth
+                {{end}}
+              </td>
+              <td>{{.Count}}</td>
+            {{end}}
+            <td>
+              <a class="c-info" href="/admin/{{$.Data.Section}}/{{.ID}}">
+                Edit {{if eq $.Data.Section "users"}}user{{else if eq $.Data.Section "groups"}}group{{else}}client{{end}}
+              </a>
+            </td>
+          </tr>
+        {{end}}
+      </tbody>
+    </table>
+  </div>
+{{else}}
+  <article>
+    <h2>No {{.Data.Section}} found</h2>
+    <p>Try another search or create a record to get started.</p>
+    <a class="c-info" href="/admin/{{.Data.Section}}">Clear search</a>
+  </article>
+{{end}}

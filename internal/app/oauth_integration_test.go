@@ -326,3 +326,62 @@ func TestOAuthPermissionChangesInvalidateGrants(t *testing.T) {
 		t.Fatalf("permissions not rechecked for code %d %v", status, v)
 	}
 }
+
+func TestOIDCSubjectPersistenceAndEndpoints(t *testing.T) {
+	f := introspectionFixture(t)
+	ctx := context.Background()
+	subject := f.a.oidcSubject(f.client, f.who.User.ID)
+	restarted, err := New(f.a.Pool, f.a.Config)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if restarted.oidcSubject(f.client, f.who.User.ID) != subject {
+		t.Fatal("subject changed on restart")
+	}
+	decode := func(raw string) map[string]any {
+		t.Helper()
+		parts := strings.Split(raw, ".")
+		if len(parts) != 3 {
+			t.Fatal("invalid JWT")
+		}
+		payload, err := base64.RawURLEncoding.DecodeString(parts[1])
+		if err != nil {
+			t.Fatal(err)
+		}
+		var claims map[string]any
+		if err = json.Unmarshal(payload, &claims); err != nil {
+			t.Fatal(err)
+		}
+		return claims
+	}
+	status, tokens := f.post("/oauth2/token", oauthCodeFields(f.code(t)))
+	if status != 200 {
+		t.Fatalf("mint: %d %v", status, tokens)
+	}
+	if decode(tokens["id_token"].(string))["sub"] != subject {
+		t.Fatal("ID token subject mismatch")
+	}
+	r := httptest.NewRequest("GET", "/oauth2/userinfo", nil)
+	r.Header.Set("Authorization", "Bearer "+tokens["access_token"].(string))
+	w := httptest.NewRecorder()
+	f.h.ServeHTTP(w, r)
+	var info map[string]any
+	if err = json.Unmarshal(w.Body.Bytes(), &info); err != nil || w.Code != 200 || info["sub"] != subject || info["username"] != f.who.User.Username {
+		t.Fatalf("UserInfo mismatch: %d %v %v", w.Code, info, err)
+	}
+	status, info = f.post("/oauth2/introspect", url.Values{"token": {tokens["access_token"].(string)}})
+	if status != 200 || info["sub"] != subject {
+		t.Fatalf("introspection mismatch: %d %v", status, info)
+	}
+	status, tokens = f.post("/oauth2/token", url.Values{"grant_type": {"refresh_token"}, "refresh_token": {tokens["refresh_token"].(string)}})
+	if status != 200 || decode(tokens["id_token"].(string))["sub"] != subject {
+		t.Fatalf("refresh mismatch: %d %v", status, tokens)
+	}
+	logout, err := f.a.logoutJWT(ctx, f.a.Q, f.client, db.LogoutDelivery{UserID: f.who.User.ID, Sid: "session", Jti: "logout"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if decode(logout)["sub"] != subject {
+		t.Fatal("logout subject mismatch")
+	}
+}

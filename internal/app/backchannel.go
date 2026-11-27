@@ -48,7 +48,7 @@ func (a *App) logoutJWT(ctx context.Context, q *db.Queries, c db.Client, d db.Lo
 	if err != nil {
 		return "", err
 	}
-	claims, err := json.Marshal(map[string]any{"iss": a.oauthIssuer(c), "aud": c.ClientID, "iat": now.Unix(), "exp": now.Add(2 * time.Minute).Unix(), "jti": d.Jti, "sub": fmt.Sprint(d.UserID), "sid": d.Sid, "events": map[string]any{logoutEvent: map[string]any{}}})
+	claims, err := json.Marshal(map[string]any{"iss": a.oauthIssuer(c), "aud": c.ClientID, "iat": now.Unix(), "exp": now.Add(2 * time.Minute).Unix(), "jti": d.Jti, "sub": a.oidcSubject(c, d.UserID), "sid": d.Sid, "events": map[string]any{logoutEvent: map[string]any{}}})
 	if err != nil {
 		return "", err
 	}

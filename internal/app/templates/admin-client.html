@@ -1,0 +1,210 @@
+<p>
+  <a class="c-info" href="/admin/clients">Back to clients</a>
+</p>
+<form method="post" action="{{.Data.Action}}">
+  {{template "csrf" $}}
+  <label for="name">Name</label>
+  <input id="name" name="name" value="{{.Data.Target.Name}}" maxlength="200" required>
+  <label for="client_type">Client type</label>
+  <select id="client_type" name="client_type">
+    <option value="Oidc" {{if eq .Data.Target.ClientType "Oidc"}}selected{{end}}>OpenID Connect</option>
+    <option value="ForwardAuth" {{if eq .Data.Target.ClientType "ForwardAuth"}}selected{{end}}>Forward auth</option>
+  </select>
+  <label for="lifetime">Session lifetime (seconds)</label>
+  <input id="lifetime" name="session_lifetime_s" type="number" value="{{.Data.Target.SessionLifetimeS}}" min="300" max="2592000" required>
+  <fieldset>
+    <label>
+      <input type="checkbox" name="require_pkce" {{if .Data.Target.RequirePkce}}checked{{end}}>
+      Require PKCE
+    </label>
+  </fieldset>
+  <fieldset>
+    <legend>OpenID Connect back-channel logout</legend>
+    <label for="backchannel-logout-uri">Logout URI (optional)</label>
+    <input id="backchannel-logout-uri" name="backchannel_logout_uri" type="url" maxlength="2048" value="{{.Data.Target.BackchannelLogoutUri}}">
+    <label>
+      <input type="checkbox" name="backchannel_logout_session_required" {{if .Data.Target.BackchannelLogoutSessionRequired}}checked{{end}}>
+      Require session identifier (sid)
+    </label>
+  </fieldset>
+  <fieldset>
+    <legend>Access journal</legend>
+    <label>
+      <input type="checkbox" name="detailed_logging" {{if .Data.Target.DetailedLogging}}checked{{end}}>
+      Record every authentication request
+    </label>
+    <label>
+      <input type="checkbox" name="allow_event_reports" {{if .Data.Target.AllowEventReports}}checked{{end}}>
+      Accept session-bound application events
+    </label>
+  </fieldset>
+  <button class="btn btn-info">Save client</button>
+</form>
+{{if not .Data.New}}
+  <hr>
+  <h2>Credentials</h2>
+  <label for="client-id">Client ID</label>
+  <input id="client-id" readonly value="{{.Data.Target.ClientID}}">
+  <details>
+    <summary>Show client secret</summary>
+    <label for="client-secret">Client secret</label>
+    <input id="client-secret" readonly value="{{.Data.Target.ClientSecret}}">
+  </details>
+  <details>
+    <summary>Rotate client secret</summary>
+    <p>The previous secret will stop working. Update the application configuration.</p>
+    <form method="post" action="/admin/clients/{{.Data.Target.ID}}/rotate-secret">
+      {{template "csrf" $}}
+      <label>
+        <input type="checkbox" name="confirm" value="rotate" required>
+        I am ready to replace the existing secret.
+      </label>
+      <button class="btn btn-warning">Generate new secret</button>
+    </form>
+  </details>
+  <h2>Endpoints</h2>
+  {{if eq .Data.Target.ClientType "Oidc"}}
+    <label>
+      Issuer
+      <input readonly value="{{.Data.Domain}}/oauth2/{{.Data.Target.Slug}}">
+    </label>
+    <label>
+      OpenID configuration
+      <input readonly value="{{.Data.Domain}}/oauth2/{{.Data.Target.Slug}}/.well-known/openid-configuration">
+    </label>
+    <label>
+      JWKS
+      <input readonly value="{{.Data.Domain}}/oauth2/{{.Data.Target.Slug}}/jwks">
+    </label>
+    <label>
+      Authorization
+      <input readonly value="{{.Data.Domain}}/oauth2/authorize">
+    </label>
+    <label>
+      Token
+      <input readonly value="{{.Data.Domain}}/oauth2/token">
+    </label>
+    <label>
+      Introspection
+      <input readonly value="{{.Data.Domain}}/oauth2/introspect">
+    </label>
+    <label>
+      Userinfo
+      <input readonly value="{{.Data.Domain}}/oauth2/userinfo">
+    </label>
+    <label>
+      Revocation
+      <input readonly value="{{.Data.Domain}}/oauth2/revoke">
+    </label>
+  {{else}}
+    <p>Configure your reverse proxy to use Guard's private ForwardAuth endpoint and this client ID.</p>
+  {{end}}
+  <label>
+    Application events
+    <input readonly value="{{.Data.Domain}}/oauth2/event">
+  </label>
+  <hr>
+  <section id="redirect-uris">
+    <h2>
+      {{if eq .Data.Target.ClientType "ForwardAuth"}}
+        Allowed origins
+      {{else}}
+        Redirect URIs
+      {{end}}
+    </h2>
+    {{range .Data.Redirects}}
+      <form class="redirect-uri-row" method="post" action="/admin/clients/{{$.Data.Target.ID}}/redirects/{{.ID}}">
+        {{template "csrf" $}}
+        <label>
+          Registered URI
+          <input name="redirect_uri" value="{{.RedirectUri}}" maxlength="2048" required>
+        </label>
+        <div class="redirect-uri-actions">
+          <button type="submit" class="btn btn-secondary">Save URI</button>
+          <button type="submit" class="btn btn-error btn-outline" formaction="/admin/clients/{{$.Data.Target.ID}}/redirects/{{.ID}}/remove" formnovalidate>Remove URI</button>
+        </div>
+      </form>
+    {{else}}
+      <p>No URIs registered.</p>
+    {{end}}
+    <form method="post" action="/admin/clients/{{.Data.Target.ID}}/redirects">
+      {{template "csrf" $}}
+      <label>
+        Add URI
+        <input name="redirect_uri" type="url" maxlength="2048" required>
+      </label>
+      <small>
+        {{if eq .Data.Target.ClientType "ForwardAuth"}}
+          Enter an exact origin: scheme, host and optional port.
+        {{else}}
+          Enter an exact callback URL. Wildcards and fragments are forbidden.
+        {{end}}
+      </small>
+      <button class="btn btn-info">Add URI</button>
+    </form>
+  </section>
+  <hr>
+  <h2>Group access rules</h2>
+  <p>Lower priority numbers win; Deny wins a tie. Without rules all users have access. With rules, users require a matching Allow.</p>
+  <div class="overflow-auto">
+    <table class="table-striped">
+      <thead>
+        <tr>
+          <th>Group</th>
+          <th>Priority</th>
+          <th>Decision</th>
+          <th>Action</th>
+        </tr>
+      </thead>
+      <tbody>
+        {{range .Data.Rules}}
+          <tr>
+            <td>
+              <a class="c-info" href="/admin/groups/{{.GroupID}}">Group {{.GroupID}}</a>
+            </td>
+            <td>{{.Priority}}</td>
+            <td>{{.AccessControl}}</td>
+            <td>
+              <form method="post" action="/admin/clients/{{$.Data.Target.ID}}/rules/{{.GroupID}}/remove">
+                {{template "csrf" $}}
+                <button class="btn btn-secondary">Remove rule</button>
+              </form>
+            </td>
+          </tr>
+        {{else}}
+          <tr>
+            <td colspan="4">No group rules configured.</td>
+          </tr>
+        {{end}}
+      </tbody>
+    </table>
+  </div>
+  <form method="post" action="/admin/clients/{{.Data.Target.ID}}/rules">
+    {{template "csrf" $}}
+    <label>
+      Group
+      <select name="group_id" required>
+        {{range .Data.Groups}}
+          <option value="{{.ID}}">{{.Name}}</option>
+        {{end}}
+      </select>
+    </label>
+    <label>
+      Priority
+      <input name="priority" type="number" min="-32768" max="32767" value="0" required>
+    </label>
+    <label>
+      Decision
+      <select name="access_control">
+        <option value="allow">Allow</option>
+        <option value="deny">Deny</option>
+      </select>
+    </label>
+    <button class="btn btn-info">Add or replace rule</button>
+  </form>
+  <p>
+    <a class="btn btn-error btn-outline" href="/admin/clients/{{.Data.Target.ID}}/delete">Delete client</a>
+  </p>
+{{else}}
+  <p>Save the client to generate credentials and configure redirects and group rules.</p>
+{{end}}

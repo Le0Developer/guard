@@ -1,0 +1,23 @@
+<p>
+  <a class="btn btn-info" role="button" href="/admin/providers/new">Add provider</a>
+</p>
+<div class="overflow-auto">
+  <table class="table-striped table-hover">
+    <tr>
+      <th>Name</th>
+      <th>Issuer</th>
+    </tr>
+    {{range .Data}}
+      <tr>
+        <td>
+          <a href="/admin/providers/{{.ID}}">{{.Name}}</a>
+        </td>
+        <td>{{.Detail}}</td>
+      </tr>
+    {{else}}
+      <tr>
+        <td>No providers configured.</td>
+      </tr>
+    {{end}}
+  </table>
+</div>

@@ -1,0 +1,29 @@
+{{if .Data.HasTOTP}}
+  <form method="post" action="/login/mfa">
+    <input type="hidden" name="csrf_token" value="{{.CSRF}}">
+    <input type="hidden" name="method" value="totp">
+    <label for="authenticator-code">Authenticator code</label>
+    <input id="authenticator-code" name="code" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" autocomplete="one-time-code" required autofocus>
+    <button class="btn btn-info" type="submit">Verify code</button>
+  </form>
+{{end}}
+{{if .Data.HasKeys}}
+  <form method="post" action="/login/mfa/key/start" data-webauthn="authenticate" data-finish="/login/mfa/key/finish">
+    <input type="hidden" name="csrf_token" value="{{.CSRF}}">
+    <button class="btn btn-info" type="submit">Use security key</button>
+    <p role="status" aria-live="polite" data-status></p>
+  </form>
+{{end}}
+<details>
+  <summary>Use a backup code</summary>
+  <form method="post" action="/login/mfa">
+    <input type="hidden" name="csrf_token" value="{{.CSRF}}">
+    <input type="hidden" name="method" value="recovery">
+    <label for="backup-code">Backup code</label>
+    <input id="backup-code" name="code" autocomplete="off" spellcheck="false" maxlength="80" required>
+    <button class="btn btn-info" type="submit">Use backup code</button>
+  </form>
+</details>
+<p>
+  <a class="c-info" href="/login">Start over</a>
+</p>

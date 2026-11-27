@@ -1,0 +1,13 @@
+<p>Enter this secret in your authenticator app:</p>
+<code>{{.Data.Secret}}</code>
+<p>
+  <a href="{{.Data.URI}}">Open authenticator</a>
+</p>
+<form method="post" action="{{.Data.Base}}/totp/confirm">
+  <input type="hidden" name="csrf_token" value="{{.CSRF}}">
+  <input type="hidden" name="ceremony" value="{{.Data.Ticket}}">
+  <label for="totp-code">Code from the app</label>
+  <input id="totp-code" name="code" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" required autocomplete="one-time-code" autofocus>
+  <button class="btn btn-info">Enable authenticator</button>
+  <a class="btn btn-secondary btn-outline" role="button" href="{{.Data.Base}}">Cancel</a>
+</form>

@@ -1,0 +1,36 @@
+<section aria-label="Directory">
+  <div class="overflow-auto">
+    <table class="table-striped table-hover">
+      <thead>
+        <tr>
+          <th scope="col">Directory</th>
+          <th scope="col">Records</th>
+          <th scope="col">Manage</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <th scope="row">Users</th>
+          <td>{{.Data.Users}}</td>
+          <td>
+            <a class="c-info" href="/admin/users">Manage users</a>
+          </td>
+        </tr>
+        <tr>
+          <th scope="row">Groups</th>
+          <td>{{.Data.Groups}}</td>
+          <td>
+            <a class="c-info" href="/admin/groups">Manage groups</a>
+          </td>
+        </tr>
+        <tr>
+          <th scope="row">Clients</th>
+          <td>{{.Data.Clients}}</td>
+          <td>
+            <a class="c-info" href="/admin/clients">Manage clients</a>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</section>

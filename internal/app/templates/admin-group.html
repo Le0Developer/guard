@@ -1,0 +1,54 @@
+<p>
+  <a class="c-info" href="/admin/groups">Back to groups</a>
+</p>
+<form method="post" action="{{.Data.Action}}">
+  {{template "csrf" $}}
+  <label for="name">Group name</label>
+  <input id="name" name="name" value="{{.Data.Target.Name}}" maxlength="200" required>
+  <button class="btn btn-info">Save group</button>
+</form>
+{{if not .Data.New}}
+  <h2>Members</h2>
+  <div class="overflow-auto">
+    <table class="table-striped">
+      <thead>
+        <tr>
+          <th>User</th>
+          <th>Action</th>
+        </tr>
+      </thead>
+      <tbody>
+        {{range .Data.Members}}
+          <tr>
+            <td>
+              <a class="c-info" href="/admin/users/{{.ID}}">{{.Username}}</a>
+            </td>
+            <td>
+              <form method="post" action="/admin/groups/{{$.Data.Target.ID}}/members/{{.ID}}/remove">
+                {{template "csrf" $}}
+                <button class="btn btn-secondary btn-outline">Remove</button>
+              </form>
+            </td>
+          </tr>
+        {{else}}
+          <tr>
+            <td colspan="2">No members.</td>
+          </tr>
+        {{end}}
+      </tbody>
+    </table>
+  </div>
+  <form method="post" action="/admin/groups/{{.Data.Target.ID}}/members">
+    {{template "csrf" $}}
+    <label for="user_id">Add a member</label>
+    <select id="user_id" name="user_id" required>
+      {{range .Data.Available}}
+        <option value="{{.ID}}">{{.Username}}</option>
+      {{end}}
+    </select>
+    <button class="btn btn-info">Add member</button>
+  </form>
+  <p>
+    <a class="btn btn-error btn-outline" href="/admin/groups/{{.Data.Target.ID}}/delete">Delete group</a>
+  </p>
+{{end}}

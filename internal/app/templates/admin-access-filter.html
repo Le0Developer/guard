@@ -1,0 +1,39 @@
+<p>
+  {{if .Data.Export}}
+    Collector delivery:
+    {{.Data.Pending}}
+    pending,
+    {{.Data.Failed}}
+    retrying.
+  {{else}}
+    Stored in Guard. External export is not configured.
+  {{end}}
+</p>
+<form method="get" action="/admin/access-log">
+  <div class="grid">
+    <div>
+      <label for="log-client">Client</label>
+      <select id="log-client" name="client_id">
+        <option value="">All clients</option>
+        {{range .Data.Clients}}
+          <option value="{{.ID}}" {{if eq (printf "%d" .ID) $.Data.ClientFilter}}selected{{end}}>{{.Name}}</option>
+        {{end}}
+      </select>
+    </div>
+    <div>
+      <label for="log-session">Guard session ID</label>
+      <input id="log-session" type="number" name="session_id" value="{{.Data.SessionFilter}}">
+    </div>
+    <div>
+      <label for="log-source">Source</label>
+      <select id="log-source" name="source">
+        <option value="">All sources</option>
+        <option value="request" {{if eq .Data.SourceFilter "request"}}selected{{end}}>Guard request</option>
+        <option value="application" {{if eq .Data.SourceFilter "application"}}selected{{end}}>Application report</option>
+        <option value="configuration" {{if eq .Data.SourceFilter "configuration"}}selected{{end}}>Configuration</option>
+      </select>
+    </div>
+  </div>
+  <button type="submit" class="btn btn-info">Filter events</button>
+  <a class="c-info" href="/admin/access-log">Clear filters</a>
+</form>

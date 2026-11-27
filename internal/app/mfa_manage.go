@@ -224,11 +224,11 @@ func (a *App) mfaManage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if setup != nil {
-		a.page(w, r, "Set up authenticator", `<p>Enter this secret in your authenticator app:</p><code>{{.Data.Secret}}</code><p><a href="{{.Data.URI}}">Open authenticator</a></p><form method="post" action="{{.Data.Base}}/totp/confirm"><input type="hidden" name="csrf_token" value="{{.CSRF}}"><input type="hidden" name="ceremony" value="{{.Data.Ticket}}"><label for="totp-code">Code from the app</label><input id="totp-code" name="code" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" required autocomplete="one-time-code" autofocus><button class="btn btn-info">Enable authenticator</button><a class="btn btn-secondary btn-outline" role="button" href="{{.Data.Base}}">Cancel</a></form>`, setup)
+		a.page(w, r, "Set up authenticator", totpSetupTemplate, setup)
 		return
 	}
 	if codes != nil {
-		a.page(w, r, "Backup codes", `<p>Save these codes now. Each can be used once.</p><ul data-backup-codes>{{range .Data.Codes}}<li><code>{{.}}</code></li>{{end}}</ul><button type="button" class="btn btn-info" data-download-codes>Download codes</button><a role="button" class="btn btn-secondary btn-outline" href="{{.Data.Base}}">Done</a>`, map[string]any{"Codes": codes, "Base": c.Base})
+		a.page(w, r, "Backup codes", backupCodesTemplate, map[string]any{"Codes": codes, "Base": c.Base})
 		return
 	}
 	destination := c.Base

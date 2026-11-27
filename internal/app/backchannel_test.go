@@ -135,7 +135,7 @@ func TestBackchannelSIDStableAndSignedDelivery(t *testing.T) {
 	}
 	raw := <-received
 	head, claims := logoutClaims(t, f.a, f.client, raw)
-	if head["typ"] != "logout+jwt" || head["alg"] != "RS256" || claims["sid"] != sid || claims["iss"] != f.a.oauthIssuer(f.client) || claims["aud"] != f.client.ClientID || claims["sub"] != fmtID(f.who.User.ID) || claims["jti"] == "" {
+	if head["typ"] != "logout+jwt" || head["alg"] != "RS256" || claims["sid"] != sid || claims["iss"] != f.a.oauthIssuer(f.client) || claims["aud"] != f.client.ClientID || claims["sub"] != f.a.oidcSubject(f.client, f.who.User.ID) || claims["jti"] == "" {
 		t.Fatalf("wrong logout JWT %v %v", head, claims)
 	}
 	if _, ok := claims["nonce"]; ok {
