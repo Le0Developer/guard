@@ -24,11 +24,9 @@ services:
       POSTGRES_USER: guard
       POSTGRES_DB: guard
       POSTGRES_HOST_AUTH_METHOD: trust
-    command: [postgres, -c, hba_file=/etc/postgresql/pg_hba.conf]
     networks: [database]
     volumes:
       - guard-postgres:/var/lib/postgresql
-      - ./postgres/pg_hba.conf:/etc/postgresql/pg_hba.conf:ro
     healthcheck:
       test: [CMD-SHELL, "pg_isready -U guard -d guard"]
       interval: 5s

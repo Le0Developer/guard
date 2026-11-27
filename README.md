@@ -49,8 +49,8 @@ To build the current checkout instead of using a published image, run
 
 Compose creates a persistent PostgreSQL volume and uses passwordless trust
 authentication on a private, internal Docker network shared only by Guard and
-PostgreSQL. The database port is not published. The supplied `postgres/pg_hba.conf`
-also applies this authentication policy to existing initialized volumes.
+PostgreSQL. The database port is not published. Trust authentication is configured
+through `POSTGRES_HOST_AUTH_METHOD=trust` when PostgreSQL initializes its volume.
 Both Guard ports are published on loopback. Point an HTTPS reverse proxy at
 4444 and keep 4445 accessible only to the proxy. On a shared Docker network,
 use `guard:4444` and `guard:4445`. Configure `AUDIT_TRUSTED_PROXIES` for the
