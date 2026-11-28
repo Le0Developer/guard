@@ -1,4 +1,6 @@
-<p>Enter this secret in your authenticator app:</p>
+<p>Scan this QR code with your authenticator app:</p>
+<p><img src="{{.Data.QRCode}}" width="320" height="320" alt="QR code for authenticator setup"></p>
+<p>Or enter this secret manually:</p>
 <code>{{.Data.Secret}}</code>
 <p>
   <a href="{{.Data.URI}}">Open authenticator</a>
