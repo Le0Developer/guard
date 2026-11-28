@@ -1,3 +1,4 @@
+<script src="{{asset "client-setup.js"}}" defer></script>
 <p>
   <a class="c-info" href="/admin/clients">Back to clients</a>
 </p>
@@ -6,21 +7,20 @@
   <label for="name">Name</label>
   <input id="name" name="name" value="{{.Data.Target.Name}}" maxlength="200" required>
   <label for="client_type">Client type</label>
-  <select id="client_type" name="client_type">
+  <select id="client_type" name="client_type" data-client-setup>
     <option value="Oidc" {{if eq .Data.Target.ClientType "Oidc"}}selected{{end}}>OpenID Connect</option>
     <option value="ForwardAuth" {{if eq .Data.Target.ClientType "ForwardAuth"}}selected{{end}}>Forward auth</option>
     <option value="Saml" {{if eq .Data.Target.ClientType "Saml"}}selected{{end}}>SAML 2.0</option>
   </select>
   <label for="lifetime">Session lifetime (seconds)</label>
   <input id="lifetime" name="session_lifetime_s" type="number" value="{{.Data.Target.SessionLifetimeS}}" min="300" max="2592000" required>
-  {{if ne .Data.Target.ClientType "Saml"}}
-  <fieldset>
+  <fieldset data-client-types="Oidc" {{if ne .Data.Target.ClientType "Oidc"}}hidden disabled{{end}}>
     <label>
       <input type="checkbox" name="require_pkce" {{if .Data.Target.RequirePkce}}checked{{end}}>
       Require PKCE
     </label>
   </fieldset>
-  <fieldset>
+  <fieldset data-client-types="Oidc" {{if ne .Data.Target.ClientType "Oidc"}}hidden disabled{{end}}>
     <legend>OpenID Connect back-channel logout</legend>
     <label for="backchannel-logout-uri">Logout URI (optional)</label>
     <input id="backchannel-logout-uri" name="backchannel_logout_uri" type="url" maxlength="2048" value="{{.Data.Target.BackchannelLogoutUri}}">
@@ -29,17 +29,18 @@
       Require session identifier (sid)
     </label>
   </fieldset>
-  {{end}}
   <fieldset>
     <legend>Access journal</legend>
     <label>
       <input type="checkbox" name="detailed_logging" {{if .Data.Target.DetailedLogging}}checked{{end}}>
       Record every authentication request
     </label>
-    {{if ne .Data.Target.ClientType "Saml"}}<label>
-      <input type="checkbox" name="allow_event_reports" {{if .Data.Target.AllowEventReports}}checked{{end}}>
-      Accept session-bound application events
-    </label>{{end}}
+    <fieldset data-client-types="Oidc ForwardAuth" {{if eq .Data.Target.ClientType "Saml"}}hidden disabled{{end}}>
+      <label>
+        <input type="checkbox" name="allow_event_reports" {{if .Data.Target.AllowEventReports}}checked{{end}}>
+        Accept session-bound application events
+      </label>
+    </fieldset>
   </fieldset>
   <label>
     <input type="checkbox" name="disabled" {{if .Data.Target.Disabled}}checked{{end}}>
