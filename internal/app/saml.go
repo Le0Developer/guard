@@ -261,7 +261,7 @@ func (a *App) samlContinue(w http.ResponseWriter, r *http.Request) {
 }
 func samlCSP(w http.ResponseWriter, action string) string {
 	nonce := security.Token()
-	w.Header().Set("Content-Security-Policy", "default-src 'none'; style-src 'self' 'unsafe-inline'; img-src 'self'; script-src 'nonce-"+nonce+"'; form-action "+action+"; base-uri 'none'; frame-ancestors 'none'")
+	w.Header().Set("Content-Security-Policy", "default-src 'none'; style-src 'self'; img-src 'self'; script-src 'nonce-"+nonce+"'; form-action "+action+"; base-uri 'none'; frame-ancestors 'none'")
 	return nonce
 }
 func (a *App) samlIssue(w http.ResponseWriter, r *http.Request) {
