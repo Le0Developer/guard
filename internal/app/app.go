@@ -93,7 +93,7 @@ func jsonResponse(w http.ResponseWriter, status int, v any) {
 	_ = json.NewEncoder(w).Encode(v)
 }
 func (a *App) page(w http.ResponseWriter, r *http.Request, title, body string, data any) {
-	t, err := template.New("page").Parse(layout + adminNavigation + adminCSRF + `{{define "content"}}` + body + `{{end}}`)
+	t, err := template.New("page").Funcs(template.FuncMap{"asset": assetPath}).Parse(layout + adminNavigation + adminCSRF + `{{define "content"}}` + body + `{{end}}`)
 	if err != nil {
 		a.serverError(w, r, err)
 		return

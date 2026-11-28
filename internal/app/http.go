@@ -6,7 +6,6 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"github.com/le0developer/guard/internal/security"
-	"io/fs"
 	"math"
 	"net"
 	"net/http"
@@ -173,8 +172,7 @@ func (a *App) Handler() http.Handler {
 	mux.HandleFunc("POST /logout", a.logout)
 	mux.HandleFunc("GET /password-reset", a.passwordReset)
 	mux.HandleFunc("POST /password-reset", a.passwordReset)
-	sub, _ := fs.Sub(assets, "assets")
-	mux.Handle("GET /static/", http.StripPrefix("/static/", http.FileServerFS(sub)))
+	registerAssets(mux)
 	mux.HandleFunc("GET /saml/{slug}/metadata", a.samlMetadata)
 	mux.HandleFunc("GET /saml/{slug}/sso", a.samlSSO)
 	mux.HandleFunc("GET /saml/{slug}/continue", a.samlContinue)

@@ -8,6 +8,7 @@
   </form>
 {{end}}
 {{if .Data.HasKeys}}
+  <script src="{{asset "security.js"}}" defer></script>
   <form method="post" action="/login/mfa/key/start" data-webauthn="authenticate" data-finish="/login/mfa/key/finish">
     <input type="hidden" name="csrf_token" value="{{.CSRF}}">
     <button class="btn btn-info" type="submit">Use security key</button>
