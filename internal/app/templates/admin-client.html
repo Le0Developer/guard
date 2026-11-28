@@ -179,7 +179,7 @@
           {{range .Data.Rules}}
             <tr>
               <td>
-                <a class="c-info" href="/admin/groups/{{.GroupID}}">Group {{.GroupID}}</a>
+                <a class="c-info" href="/admin/groups/{{.GroupID}}">{{index $.Data.GroupNames .GroupID}}</a>
               </td>
               <td>{{.Priority}}</td>
               <td>{{.AccessControl}}</td>

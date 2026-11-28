@@ -233,7 +233,9 @@ func (a *App) adminForm(w http.ResponseWriter, r *http.Request, section string) 
 			return e
 		}
 		active := []db.Group{}
+		groupNames := make(map[ids.GroupID]string, len(groups))
 		for _, g := range groups {
+			groupNames[g.ID] = g.Name
 			if g.DeletedAt == nil {
 				active = append(active, g)
 			}
@@ -242,6 +244,7 @@ func (a *App) adminForm(w http.ResponseWriter, r *http.Request, section string) 
 		data["Redirects"] = redirects
 		data["Rules"] = rules
 		data["Groups"] = active
+		data["GroupNames"] = groupNames
 		data["Domain"] = strings.TrimRight(a.Config.Domain, "/")
 		body = adminClientTemplate
 	}
