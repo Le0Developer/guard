@@ -86,13 +86,16 @@ func (a *App) adminSAMLWrite(w http.ResponseWriter, r *http.Request, actor *iden
 			return adminInvalid("Enter an HTTPS application login URL, or HTTP loopback URL.")
 		}
 	}
-	e = a.adminMutation(r, actor, func() any { return id }, func(q *db.Queries) error {
+	e = a.adminMutation(r, actor, func() any { return id }, func(q *db.Queries, change *adminAuditChange) error {
 		c, e := adminClient(r.Context(), q, id, true)
 		if e != nil {
 			return e
 		}
 		if c.ClientType != "Saml" {
 			return adminMissing()
+		}
+		if e = change.capture(r.Context(), q, id); e != nil {
+			return e
 		}
 		lines := strings.Split(strings.TrimSpace(r.PostForm.Get("acs")), "\n")
 		if len(lines) > 32 {
@@ -184,7 +187,7 @@ func (a *App) adminSAMLWrite(w http.ResponseWriter, r *http.Request, actor *iden
 				return e
 			}
 		}
-		return a.audit(r.Context(), q, actor.User.ID, "SAMLConfigured", map[string]any{"client_id": id})
+		return nil // adminMutation records the complete SAML configuration diff.
 	})
 	if e != nil {
 		return e

@@ -69,45 +69,71 @@ func (a *App) adminResult(w http.ResponseWriter, r *http.Request, err error) {
 
 type adminHandler func(http.ResponseWriter, *http.Request, *identity) error
 
-func (a *App) registerAdmin(mux *http.ServeMux) {
-	bind := func(pattern string, h adminHandler) {
-		mux.HandleFunc(pattern, func(w http.ResponseWriter, r *http.Request) {
-			actor, ok := a.requireAdmin(w, r)
-			if !ok {
+func (a *App) bindAdmin(mux *http.ServeMux, pattern string, h adminHandler) {
+	mux.HandleFunc(pattern, func(w http.ResponseWriter, r *http.Request) {
+		actor, ok := a.requireAdmin(w, r)
+		if !ok {
+			return
+		}
+		if r.Method == "POST" {
+			if err := r.ParseForm(); err != nil {
+				a.fail(w, r, 400, "Invalid form.")
 				return
 			}
-			if r.Method == "POST" {
-				if err := r.ParseForm(); err != nil {
-					a.fail(w, r, 400, "Invalid form.")
-					return
+		}
+		err := h(w, r, actor)
+		if err != nil && r.Method == "POST" {
+			status := 503
+			var input adminError
+			if errors.As(err, &input) {
+				status = input.status
+			} else if notFound(err) {
+				status = 404
+			} else {
+				var pe *pgconn.PgError
+				if errors.As(err, &pe) && pe.Code == "23505" {
+					status = 422
 				}
 			}
-			err := h(w, r, actor)
-			if err != nil && r.Method == "POST" {
-				status := 503
-				var input adminError
-				if errors.As(err, &input) {
-					status = input.status
-				} else if notFound(err) {
-					status = 404
+			var target any
+			switch {
+			case strings.Contains(r.Pattern, "/users/"):
+				if id, parseErr := adminID[ids.UserID](r.PathValue("id")); parseErr == nil {
+					target = id
 				}
-				var target any
-				switch {
-				case strings.Contains(r.Pattern, "/users/"):
-					target, _ = adminID[ids.UserID](r.PathValue("id"))
-				case strings.Contains(r.Pattern, "/groups/"):
-					target, _ = adminID[ids.GroupID](r.PathValue("id"))
-				case strings.Contains(r.Pattern, "/clients/"):
-					target, _ = adminID[ids.ClientID](r.PathValue("id"))
+			case strings.Contains(r.Pattern, "/groups/"):
+				if id, parseErr := adminID[ids.GroupID](r.PathValue("id")); parseErr == nil {
+					target = id
 				}
-				data := map[string]any{"action": r.Pattern, "target_id": target, "status": status}
-				if auditErr := a.audit(r.Context(), a.Q, actor.User.ID, "AdminAction", data); auditErr != nil {
-					err = auditErr
+			case strings.Contains(r.Pattern, "/providers/"):
+				if id, parseErr := adminID[ids.UpstreamProviderID](r.PathValue("id")); parseErr == nil {
+					target = id
+				}
+			case strings.Contains(r.Pattern, "/clients/"):
+				if id, parseErr := adminID[ids.ClientID](r.PathValue("id")); parseErr == nil {
+					target = id
 				}
 			}
-			a.adminResult(w, r, err)
-		})
-	}
+			data := map[string]any{"action": r.Pattern, "target_id": target, "status": status, "outcome": "failed"}
+			data["summary"] = "Admin action failed"
+			if target != nil {
+				if state, snapshotErr := adminAuditSnapshot(r.Context(), a.Q, target); snapshotErr == nil {
+					data["target"] = map[string]any{"type": state.Type, "id": state.ID, "name": state.Name}
+				}
+			}
+			if input.message != "" {
+				data["reason"] = input.message
+			}
+			if auditErr := a.audit(r.Context(), a.Q, actor.User.ID, "AdminAction", data); auditErr != nil {
+				err = auditErr
+			}
+		}
+		a.adminResult(w, r, err)
+	})
+}
+
+func (a *App) registerAdmin(mux *http.ServeMux) {
+	bind := func(pattern string, h adminHandler) { a.bindAdmin(mux, pattern, h) }
 	bind("GET /admin", a.adminHome)
 	bind("GET /admin/clients/{id}/saml", a.adminSAML)
 	bind("POST /admin/clients/{id}/saml", a.adminSAMLWrite)
@@ -198,15 +224,32 @@ func adminRevokeUser(ctx context.Context, q *db.Queries, id ids.UserID) error {
 	}
 	return q.AdminDeleteUserSessions(ctx, id)
 }
-func (a *App) adminMutation(r *http.Request, actor *identity, target any, fn func(*db.Queries) error) error {
+func (a *App) adminMutation(r *http.Request, actor *identity, target any, fn func(*db.Queries, *adminAuditChange) error) error {
 	return transaction(r.Context(), a.Pool, func(q *db.Queries) error {
-		if err := fn(q); err != nil {
+		change := &adminAuditChange{}
+		if err := fn(q, change); err != nil {
 			return err
 		}
 		if resolve, ok := target.(func() any); ok {
 			target = resolve()
 		}
-		return a.audit(r.Context(), q, actor.User.ID, "AdminAction", map[string]any{"action": r.Pattern, "target_id": target, "status": 303})
+		snapshotTarget := target
+		if change.target != nil {
+			snapshotTarget = change.target
+		}
+		after, err := adminAuditSnapshot(r.Context(), q, snapshotTarget)
+		if err != nil {
+			return err
+		}
+		data := adminAuditData(r, change.before, after)
+		if len(change.operations) > 0 {
+			data["operations"] = append(data["operations"].([]string), change.operations...)
+			if data["outcome"] == "unchanged" {
+				data["outcome"] = "updated"
+				data["summary"] = adminAuditSummary(r, after.Type, "updated")
+			}
+		}
+		return a.audit(r.Context(), q, actor.User.ID, "AdminAction", data)
 	})
 }
 func adminSaved(w http.ResponseWriter, r *http.Request, path string) {

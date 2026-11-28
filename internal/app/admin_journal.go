@@ -46,7 +46,7 @@ func (a *App) adminAudit(w http.ResponseWriter, r *http.Request, _ *identity) er
 			actor = fmt.Sprintf("%s (#%d)", u.Username, log.UserID)
 			actors[log.UserID] = actor
 		}
-		rows = append(rows, adminJournalRow{ID: fmt.Sprint(log.ID), Time: log.CreatedAt.Format("2006-01-02 15:04:05Z07:00"), Actor: actor, Action: log.Event, Data: adminPretty(log.Data)})
+		rows = append(rows, adminJournalRow{ID: fmt.Sprint(log.ID), Time: log.CreatedAt.Format("2006-01-02 15:04:05Z07:00"), Actor: actor, Action: adminAuditLabel(log.Event, log.Data), Data: adminPretty(log.Data)})
 	}
 	next := ""
 	if more {
@@ -151,4 +151,21 @@ func (a *App) adminAccess(w http.ResponseWriter, r *http.Request, _ *identity) e
 	}
 	a.page(w, r, "Access journal", adminAccessFilter+adminJournalTemplate, map[string]any{"Rows": rows, "Next": next, "Access": true, "Clients": clients, "ClientFilter": r.URL.Query().Get("client_id"), "SessionFilter": r.URL.Query().Get("session_id"), "SourceFilter": source, "Pending": counts.Pending, "Failed": counts.Failed, "Export": a.Config.ExportURL != ""})
 	return nil
+}
+
+// Historical records and non-admin events retain their original labels.
+func adminAuditLabel(event string, raw []byte) string {
+	var data struct {
+		Summary string `json:"summary"`
+		Target  struct {
+			Name string `json:"name"`
+		} `json:"target"`
+	}
+	if json.Unmarshal(raw, &data) != nil || data.Summary == "" {
+		return event
+	}
+	if data.Target.Name != "" {
+		return data.Summary + " · " + data.Target.Name
+	}
+	return data.Summary
 }

@@ -31,7 +31,7 @@ func (a *App) adminWrite(w http.ResponseWriter, r *http.Request, actor *identity
 		if err = adminRequired(name, "Group name", 200); err != nil {
 			return err
 		}
-		err = a.adminMutation(r, actor, func() any { return id }, func(q *db.Queries) error {
+		err = a.adminMutation(r, actor, func() any { return id }, func(q *db.Queries, change *adminAuditChange) error {
 			groups, e := q.ListGroups(ctx)
 			if e != nil {
 				return e
@@ -48,6 +48,9 @@ func (a *App) adminWrite(w http.ResponseWriter, r *http.Request, actor *identity
 			}
 			g, e := adminGroup(ctx, q, id, true)
 			if e != nil {
+				return e
+			}
+			if e = change.capture(ctx, q, id); e != nil {
 				return e
 			}
 			_, e = q.UpdateGroup(ctx, db.UpdateGroupParams{ID: id, Name: name, DeletedAt: g.DeletedAt})
@@ -99,7 +102,7 @@ func (a *App) adminWrite(w http.ResponseWriter, r *http.Request, actor *identity
 			}
 		}
 	}
-	err = a.adminMutation(r, actor, func() any { return id }, func(q *db.Queries) error {
+	err = a.adminMutation(r, actor, func() any { return id }, func(q *db.Queries, change *adminAuditChange) error {
 		if raw == "" {
 			u, e := q.CreateUser(ctx, db.CreateUserParams{ForcePasswordReset: forcePasswordReset, Username: username, Email: email, Password: hash, Role: role, Disabled: disabled, MfaRevision: 0, MfaFailures: 0, MfaWindow: nil, WebauthnUserID: []byte(security.Token()), DeletedAt: nil})
 			id = u.ID
@@ -107,6 +110,9 @@ func (a *App) adminWrite(w http.ResponseWriter, r *http.Request, actor *identity
 		}
 		u, e := adminUser(ctx, q, id, true)
 		if e != nil {
+			return e
+		}
+		if e = change.capture(r.Context(), q, id); e != nil {
 			return e
 		}
 		p := adminUserParams(u)
@@ -164,9 +170,12 @@ func (a *App) adminUserAction(w http.ResponseWriter, r *http.Request, actor *ide
 	} else if id == actor.User.ID {
 		return adminInvalid("You cannot change your own administrator role.")
 	}
-	err = a.adminMutation(r, actor, func() any { return id }, func(q *db.Queries) error {
+	err = a.adminMutation(r, actor, func() any { return id }, func(q *db.Queries, change *adminAuditChange) error {
 		u, e := adminUser(r.Context(), q, id, true)
 		if e != nil {
+			return e
+		}
+		if e = change.capture(r.Context(), q, id); e != nil {
 			return e
 		}
 		p := adminUserParams(u)
@@ -204,8 +213,11 @@ func (a *App) adminRevokeSessions(w http.ResponseWriter, r *http.Request, actor 
 		return err
 	}
 	current := id == actor.User.ID
-	err = a.adminMutation(r, actor, func() any { return id }, func(q *db.Queries) error {
+	err = a.adminMutation(r, actor, func() any { return id }, func(q *db.Queries, change *adminAuditChange) error {
 		if _, e := adminUser(r.Context(), q, id, true); e != nil {
+			return e
+		}
+		if e := change.capture(r.Context(), q, id); e != nil {
 			return e
 		}
 		if raw := r.PathValue("session_id"); raw != "" {
@@ -249,11 +261,14 @@ func (a *App) adminMembership(w http.ResponseWriter, r *http.Request, actor *ide
 	if err != nil {
 		return adminInvalid("Choose a user.")
 	}
-	err = a.adminMutation(r, actor, gid, func(q *db.Queries) error {
+	err = a.adminMutation(r, actor, gid, func(q *db.Queries, change *adminAuditChange) error {
 		if _, e := adminUser(r.Context(), q, uid, true); e != nil {
 			return e
 		}
 		if _, e := adminGroup(r.Context(), q, gid, true); e != nil {
+			return e
+		}
+		if e := change.capture(r.Context(), q, gid); e != nil {
 			return e
 		}
 		if remove {
@@ -312,7 +327,7 @@ func (a *App) adminDelete(w http.ResponseWriter, r *http.Request, actor *identit
 	ctx := r.Context()
 	raw := r.PathValue("id")
 	now := time.Now()
-	err := a.adminMutation(r, actor, raw, func(q *db.Queries) error {
+	err := a.adminMutation(r, actor, raw, func(q *db.Queries, change *adminAuditChange) error {
 		switch section {
 		case "users":
 			id, e := adminID[ids.UserID](raw)
@@ -324,6 +339,9 @@ func (a *App) adminDelete(w http.ResponseWriter, r *http.Request, actor *identit
 			}
 			u, e := adminUser(ctx, q, id, true)
 			if e != nil {
+				return e
+			}
+			if e = change.capture(r.Context(), q, id); e != nil {
 				return e
 			}
 			p := adminUserParams(u)
@@ -354,6 +372,9 @@ func (a *App) adminDelete(w http.ResponseWriter, r *http.Request, actor *identit
 			if e != nil {
 				return e
 			}
+			if e = change.capture(ctx, q, id); e != nil {
+				return e
+			}
 			for _, c := range clients {
 				rules, e := q.ClientAccessRulesByClientId(ctx, c.ID)
 				if e != nil {
@@ -363,7 +384,7 @@ func (a *App) adminDelete(w http.ResponseWriter, r *http.Request, actor *identit
 					if _, e = q.SetClientDisabled(ctx, db.SetClientDisabledParams{ID: c.ID, Disabled: true}); e != nil {
 						return e
 					}
-					if e = a.audit(ctx, q, actor.User.ID, "ClientDisabled", map[string]any{"client_id": c.ID, "group_id": id, "reason": "last access rule removed"}); e != nil {
+					if e = a.audit(ctx, q, actor.User.ID, "ClientDisabled", map[string]any{"client_id": c.ID, "client_name": c.Name, "group_id": id, "group_name": g.Name, "reason": "last access rule removed", "changes": map[string]any{"disabled": map[string]any{"before": false, "after": true}}}); e != nil {
 						return e
 					}
 				}
@@ -385,11 +406,15 @@ func (a *App) adminDelete(w http.ResponseWriter, r *http.Request, actor *identit
 			if e != nil {
 				return e
 			}
+			if e = change.capture(ctx, q, id); e != nil {
+				return e
+			}
 			for _, fn := range []func(context.Context, ids.ClientID) error{q.AdminDeleteClientRules, q.AdminDeleteClientRedirects, q.AdminDeleteClientCodes, q.AdminDeleteClientRequests, q.AdminDeleteClientSessions} {
 				if e = fn(ctx, id); e != nil {
 					return e
 				}
 			}
+			change.operations = []string{"authorization_codes_invalidated", "forward_auth_requests_invalidated", "forward_auth_sessions_revoked"}
 			p := adminClientParams(c)
 			p.DeletedAt = &now
 			_, e = q.UpdateClient(ctx, p)

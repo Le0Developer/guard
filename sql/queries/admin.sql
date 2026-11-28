@@ -60,3 +60,11 @@ LOCK TABLE clients IN EXCLUSIVE MODE;
 
 -- name: SetClientDisabled :one
 UPDATE clients SET disabled = $2, updated_at = now() WHERE id = $1 RETURNING *;
+
+-- name: AdminProviderSessions :many
+SELECT session_id FROM upstream_sessions WHERE provider_id = $1 ORDER BY session_id;
+
+-- name: AdminGroupAccessRules :many
+SELECT r.client_id, c.name AS client_name, r.priority, r.access_control
+FROM client_access_rules r JOIN clients c ON c.id = r.client_id
+WHERE r.group_id = $1 ORDER BY r.client_id;

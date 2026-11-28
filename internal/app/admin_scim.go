@@ -67,7 +67,7 @@ func (a *App) adminSCIMSave(w http.ResponseWriter, r *http.Request, actor *ident
 		value := r.Form.Get("group_patterns")
 		patterns = &value
 	}
-	if err = a.saveSCIMAs(r.Context(), id, r.Form.Get("endpoint"), r.Form.Get("secret"), r.Form.Get("enabled") == "on", actor.User.ID, patterns); err != nil {
+	if err = a.saveSCIMAs(r.Context(), id, r.Form.Get("endpoint"), r.Form.Get("secret"), r.Form.Get("enabled") == "on", &actor.User.ID, patterns); err != nil {
 		return err
 	}
 	http.Redirect(w, r, scimAdminPath(id), http.StatusSeeOther)
@@ -93,7 +93,7 @@ func (a *App) adminSCIMSync(w http.ResponseWriter, r *http.Request, actor *ident
 		if n == 0 {
 			return adminInvalid("Enable SCIM provisioning before requesting synchronization.")
 		}
-		return a.audit(r.Context(), q, actor.User.ID, "SCIMSyncRequested", map[string]any{"client_id": id})
+		return a.audit(r.Context(), q, actor.User.ID, "SCIMSyncRequested", map[string]any{"client_id": id, "summary": "SCIM synchronization requested", "outcome": "requested", "target": map[string]any{"type": "client", "id": id, "name": c.Name}, "operations": []string{"scim_sync_requested"}})
 	})
 	if err != nil {
 		return err

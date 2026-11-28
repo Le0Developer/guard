@@ -60,7 +60,7 @@ func TestSCIMSyncGroupWhitelistAndRemoval(t *testing.T) {
 	}
 	drainSCIM(t, a)
 	whitelist := "team-*\nAdmins"
-	if err = a.saveSCIMAs(ctx, c.ID, cfg.Endpoint, "", true, 0, &whitelist); err != nil {
+	if err = a.saveSCIMAs(ctx, c.ID, cfg.Endpoint, "", true, nil, &whitelist); err != nil {
 		t.Fatal(err)
 	}
 	drainSCIM(t, a)
@@ -76,7 +76,7 @@ func TestSCIMSyncGroupWhitelistAndRemoval(t *testing.T) {
 		t.Fatalf("wrong whitelist population %#v", names)
 	}
 	whitelist = ""
-	if err = a.saveSCIMAs(ctx, c.ID, cfg.Endpoint, "", true, 0, &whitelist); err != nil {
+	if err = a.saveSCIMAs(ctx, c.ID, cfg.Endpoint, "", true, nil, &whitelist); err != nil {
 		t.Fatal(err)
 	}
 	drainSCIM(t, a)

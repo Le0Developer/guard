@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -140,6 +141,26 @@ func TestAdminUpstreamLifecycle(t *testing.T) {
 	}
 	if _, err = a.Q.GetLoginSession(ctx, pending.ID); !notFound(err) {
 		t.Fatalf("pending provider login survived: %v", err)
+	}
+	logs, auditErr := a.Q.AdminAuditPage(ctx, 1<<63-1)
+	if auditErr != nil || len(logs) == 0 {
+		t.Fatalf("audit: %v", auditErr)
+	}
+	var auditData map[string]any
+	if err := json.Unmarshal(logs[0].Data, &auditData); err != nil {
+		t.Fatal(err)
+	}
+	changes, ok := auditData["changes"].(map[string]any)
+	if !ok || changes["name"].(map[string]any)["before"] != "Example" || changes["name"].(map[string]any)["after"] != "Renamed" || changes["enabled"].(map[string]any)["after"] != false {
+		t.Fatalf("missing provider changes: %#v", auditData)
+	}
+	if changes[fmt.Sprintf("sessions.%d", s.ID)].(map[string]any)["after"] != nil {
+		t.Fatal("revoked provider session missing")
+	}
+	for _, log := range logs {
+		if strings.Contains(string(log.Data), p.ClientSecret) || strings.Contains(string(log.Data), "provider-internal") {
+			t.Fatal("provider credential leaked")
+		}
 	}
 	if w := request("POST", path+"/delete", nil); w.Code != 303 {
 		t.Fatalf("delete %d", w.Code)

@@ -36,13 +36,16 @@ func (a *App) adminWriteClient(w http.ResponseWriter, r *http.Request, actor *id
 	if e != nil || lifetime < 300 || lifetime > 2592000 {
 		return adminInvalid("Session lifetime must be 300–2592000 seconds.")
 	}
-	err = a.adminMutation(r, actor, func() any { return id }, func(q *db.Queries) error {
+	err = a.adminMutation(r, actor, func() any { return id }, func(q *db.Queries, change *adminAuditChange) error {
 		var c db.Client
 		var e error
 		var old map[string]bool
 		if id != 0 {
 			c, e = adminClient(r.Context(), q, id, true)
 			if e != nil {
+				return e
+			}
+			if e = change.capture(r.Context(), q, id); e != nil {
 				return e
 			}
 			old = map[string]bool{"detailed_logging": c.DetailedLogging, "allow_event_reports": c.AllowEventReports}
@@ -94,7 +97,7 @@ func (a *App) adminWriteClient(w http.ResponseWriter, r *http.Request, actor *id
 		if old != nil && old["detailed_logging"] == c.DetailedLogging && old["allow_event_reports"] == c.AllowEventReports || old == nil && !c.DetailedLogging && !c.AllowEventReports {
 			return nil
 		}
-		settings := map[string]any{"client_id": id, "previous": old, "detailed_logging": c.DetailedLogging, "allow_event_reports": c.AllowEventReports}
+		settings := map[string]any{"client_id": id, "client_name": c.Name, "previous": old, "detailed_logging": c.DetailedLogging, "allow_event_reports": c.AllowEventReports}
 		if e = a.audit(r.Context(), q, actor.User.ID, "ClientLoggingConfiguration", settings); e != nil {
 			return e
 		}
@@ -113,9 +116,12 @@ func (a *App) adminClientAction(w http.ResponseWriter, r *http.Request, actor *i
 		return err
 	}
 	ctx := r.Context()
-	err = a.adminMutation(r, actor, func() any { return id }, func(q *db.Queries) error {
+	err = a.adminMutation(r, actor, func() any { return id }, func(q *db.Queries, change *adminAuditChange) error {
 		c, e := adminClient(ctx, q, id, true)
 		if e != nil {
+			return e
+		}
+		if e = change.capture(ctx, q, id); e != nil {
 			return e
 		}
 		if c.ClientType == "Saml" && !strings.Contains(r.URL.Path, "/rules") {

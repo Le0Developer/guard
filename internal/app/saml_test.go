@@ -6,6 +6,7 @@ import (
 	"context"
 	"crypto/x509"
 	"encoding/base64"
+	"encoding/json"
 	"encoding/xml"
 	"fmt"
 	"github.com/crewjam/saml"
@@ -384,9 +385,37 @@ func TestSAMLAdminSaveKeepsSingleCertificate(t *testing.T) {
 	if e != nil || len(keys) != 1 {
 		t.Fatalf("want one certificate: %d %v", len(keys), e)
 	}
+	logs, auditErr := a.Q.AdminAuditPage(ctx, 1<<63-1)
+	if auditErr != nil || len(logs) == 0 {
+		t.Fatalf("audit: %v", auditErr)
+	}
+	var auditData map[string]any
+	if err := json.Unmarshal(logs[0].Data, &auditData); err != nil {
+		t.Fatal(err)
+	}
+	changes, ok := auditData["changes"].(map[string]any)
+	if !ok || changes["saml"].(map[string]any)["before"].(map[string]any)["launch_url"] != "" || changes["saml"].(map[string]any)["after"].(map[string]any)["launch_url"] != "https://sp/login" {
+		t.Fatalf("missing SAML diff: %#v", auditData)
+	}
+	if changes["saml_acs.1"].(map[string]any)["after"].(map[string]any)["url"] != "https://sp/second" {
+		t.Fatal("new ACS missing")
+	}
+	if strings.Contains(string(logs[0].Data), keys[0].PrivateKey) {
+		t.Fatal("SAML private key leaked")
+	}
 	original := append([]byte(nil), keys[0].Certificate...)
 	if out := request(path, form); out.Code != 303 {
 		t.Fatalf("save again %d %s", out.Code, out.Body.String())
+	}
+	logs, auditErr = a.Q.AdminAuditPage(ctx, 1<<63-1)
+	if auditErr != nil {
+		t.Fatal(auditErr)
+	}
+	if err := json.Unmarshal(logs[0].Data, &auditData); err != nil {
+		t.Fatal(err)
+	}
+	if auditData["outcome"] != "unchanged" || len(auditData["changes"].(map[string]any)) != 0 {
+		t.Fatalf("identical SAML save invented changes: %#v", auditData)
 	}
 	keys, e = a.Q.SAMLKeys(ctx, c.ID)
 	if e != nil || len(keys) != 1 || !bytes.Equal(original, keys[0].Certificate) {

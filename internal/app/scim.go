@@ -56,9 +56,9 @@ func (a *App) scimOpen(id ids.ClientID, sealed string) (string, error) {
 	return string(out), nil
 }
 func (a *App) saveSCIM(ctx context.Context, id ids.ClientID, endpoint, secret string, enabled bool) error {
-	return a.saveSCIMAs(ctx, id, endpoint, secret, enabled, 0, nil)
+	return a.saveSCIMAs(ctx, id, endpoint, secret, enabled, nil, nil)
 }
-func (a *App) saveSCIMAs(ctx context.Context, id ids.ClientID, endpoint, secret string, enabled bool, actor ids.UserID, groupPatterns *string) error {
+func (a *App) saveSCIMAs(ctx context.Context, id ids.ClientID, endpoint, secret string, enabled bool, actor *ids.UserID, groupPatterns *string) error {
 	endpoint = strings.TrimRight(strings.TrimSpace(endpoint), "/")
 	if err := validateSCIMURL(endpoint); err != nil {
 		return adminInvalid(err.Error())
@@ -78,6 +78,7 @@ func (a *App) saveSCIMAs(ctx context.Context, id ids.ClientID, endpoint, secret 
 		if err != nil && !notFound(err) {
 			return err
 		}
+		configured := err == nil
 		patterns := old.GroupPatterns
 		if notFound(err) {
 			patterns = "*"
@@ -102,12 +103,20 @@ func (a *App) saveSCIMAs(ctx context.Context, id ids.ClientID, endpoint, secret 
 		if old.Endpoint != "" && old.Endpoint != endpoint && secret == "" {
 			return adminInvalid("Enter a bearer secret when changing the SCIM endpoint.")
 		}
-		_, err = q.SaveSCIMConfig(ctx, db.SaveSCIMConfigParams{ClientID: id, Endpoint: endpoint, Secret: sealed, Enabled: enabled, GroupPatterns: patterns})
+		saved, err := q.SaveSCIMConfig(ctx, db.SaveSCIMConfigParams{ClientID: id, Endpoint: endpoint, Secret: sealed, Enabled: enabled, GroupPatterns: patterns})
 		if err != nil {
 			return err
 		}
-		if actor != 0 {
-			return a.audit(ctx, q, actor, "SCIMConfigurationChanged", map[string]any{"client_id": id, "enabled": enabled, "endpoint_changed": old.Endpoint != endpoint, "group_scope_changed": old.GroupPatterns != patterns})
+		if actor != nil {
+			var before *adminAuditState
+			if configured {
+				before = adminAuditSCIMState(c, old)
+			}
+			data := adminAuditDetails(before, adminAuditSCIMState(c, saved))
+			data["summary"] = "SCIM configuration saved"
+			data["client_id"], data["enabled"] = id, enabled
+			data["endpoint_changed"], data["group_scope_changed"] = old.Endpoint != endpoint, old.GroupPatterns != patterns
+			return a.audit(ctx, q, *actor, "SCIMConfigurationChanged", data)
 		}
 		return nil
 	})

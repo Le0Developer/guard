@@ -218,6 +218,44 @@ func (q *Queries) AdminDeliveryCounts(ctx context.Context) (AdminDeliveryCountsR
 	return i, err
 }
 
+const adminGroupAccessRules = `-- name: AdminGroupAccessRules :many
+SELECT r.client_id, c.name AS client_name, r.priority, r.access_control
+FROM client_access_rules r JOIN clients c ON c.id = r.client_id
+WHERE r.group_id = $1 ORDER BY r.client_id
+`
+
+type AdminGroupAccessRulesRow struct {
+	ClientID      ids.ClientID `json:"client_id"`
+	ClientName    string       `json:"client_name"`
+	Priority      int16        `json:"priority"`
+	AccessControl string       `json:"access_control"`
+}
+
+func (q *Queries) AdminGroupAccessRules(ctx context.Context, groupID ids.GroupID) ([]AdminGroupAccessRulesRow, error) {
+	rows, err := q.db.Query(ctx, adminGroupAccessRules, groupID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []AdminGroupAccessRulesRow{}
+	for rows.Next() {
+		var i AdminGroupAccessRulesRow
+		if err := rows.Scan(
+			&i.ClientID,
+			&i.ClientName,
+			&i.Priority,
+			&i.AccessControl,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const adminInvalidateUserLogins = `-- name: AdminInvalidateUserLogins :exec
 UPDATE users SET mfa_revision = mfa_revision + 1, updated_at = now() WHERE id = $1
 `
@@ -225,6 +263,30 @@ UPDATE users SET mfa_revision = mfa_revision + 1, updated_at = now() WHERE id = 
 func (q *Queries) AdminInvalidateUserLogins(ctx context.Context, id ids.UserID) error {
 	_, err := q.db.Exec(ctx, adminInvalidateUserLogins, id)
 	return err
+}
+
+const adminProviderSessions = `-- name: AdminProviderSessions :many
+SELECT session_id FROM upstream_sessions WHERE provider_id = $1 ORDER BY session_id
+`
+
+func (q *Queries) AdminProviderSessions(ctx context.Context, providerID ids.UpstreamProviderID) ([]ids.SessionID, error) {
+	rows, err := q.db.Query(ctx, adminProviderSessions, providerID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ids.SessionID{}
+	for rows.Next() {
+		var session_id ids.SessionID
+		if err := rows.Scan(&session_id); err != nil {
+			return nil, err
+		}
+		items = append(items, session_id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const adminSaveRule = `-- name: AdminSaveRule :exec

@@ -10,21 +10,7 @@ import (
 )
 
 func (a *App) registerUpstreamAdmin(mux *http.ServeMux) {
-	bind := func(pattern string, h adminHandler) {
-		mux.HandleFunc(pattern, func(w http.ResponseWriter, r *http.Request) {
-			actor, ok := a.requireAdmin(w, r)
-			if !ok {
-				return
-			}
-			if r.Method == "POST" {
-				if r.ParseForm() != nil {
-					a.fail(w, r, 400, "Invalid form.")
-					return
-				}
-			}
-			a.adminResult(w, r, h(w, r, actor))
-		})
-	}
+	bind := func(pattern string, h adminHandler) { a.bindAdmin(mux, pattern, h) }
 	bind("GET /admin/providers", a.adminProviders)
 	bind("GET /admin/providers/new", a.adminProviderForm)
 	bind("GET /admin/providers/{id}", a.adminProviderForm)
@@ -161,7 +147,7 @@ func (a *App) adminProviderWrite(w http.ResponseWriter, r *http.Request, actor *
 	}
 	setup := db.SetUpstreamProviderSetupParams{ConfigurationMode: p.ConfigurationMode, DiscoveryUrl: p.DiscoveryUrl, SubjectField: p.SubjectField, EmailField: p.EmailField, EmailVerifiedField: p.EmailVerifiedField, ClientAuthMethod: p.ClientAuthMethod}
 
-	err := a.adminMutation(r, actor, func() any { return p.ID }, func(q *db.Queries) error {
+	err := a.adminMutation(r, actor, func() any { return p.ID }, func(q *db.Queries, change *adminAuditChange) error {
 		if fresh {
 			for attempt := 1; ; attempt++ {
 				p.Slug = upstreamProviderSlug(p.Name, attempt)
@@ -187,6 +173,9 @@ func (a *App) adminProviderWrite(w http.ResponseWriter, r *http.Request, actor *
 		}
 		if locked.Revision != old.Revision {
 			return adminInvalid("Provider changed. Reload and try again.")
+		}
+		if err = change.capture(r.Context(), q, p.ID); err != nil {
+			return err
 		}
 		if err = q.DeleteSessionsForProvider(r.Context(), p.ID); err != nil {
 			return err
@@ -221,13 +210,16 @@ func (a *App) adminProviderDelete(w http.ResponseWriter, r *http.Request, actor 
 	if err != nil {
 		return err
 	}
-	err = a.adminMutation(r, actor, id, func(q *db.Queries) error {
+	err = a.adminMutation(r, actor, id, func(q *db.Queries, change *adminAuditChange) error {
 		p, err := q.LockUpstreamProvider(r.Context(), id)
 		if err != nil {
 			return err
 		}
 		if p.DeletedAt != nil {
 			return adminMissing()
+		}
+		if err = change.capture(r.Context(), q, p.ID); err != nil {
+			return err
 		}
 		if err = q.DeleteSessionsForProvider(r.Context(), id); err != nil {
 			return err
